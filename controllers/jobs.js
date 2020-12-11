@@ -1,7 +1,12 @@
 const { validationResult } = require('express-validator');
+const Sequelize = require('sequelize');
+
 
 const Job = require('../models/job');
+const { json } = require('body-parser');
+const { where } = require('sequelize');
 
+let totalJobs = countJobs();
 
     // #TODO: Move to admin controller
 exports.createJob = (req, res, next) => {
@@ -28,6 +33,7 @@ exports.createJob = (req, res, next) => {
         featured: featured
     })
     .then(result => {
+        totalJobs++;
         res.status(201).json({
             message: 'Job created sucessfully',
             job: { id: new Date().toISOString(), title: title, wage: wage, location: location, description: description, featured: featured }
@@ -39,8 +45,6 @@ exports.createJob = (req, res, next) => {
             message: 'Please contact your administrator'
         });
     });
-
-
 };
 
 exports.getFeaturedJobs = (req, res, next) => {
@@ -56,6 +60,58 @@ exports.getFeaturedJobs = (req, res, next) => {
 
 };
 
+// #TODO: Sanitise inputs?
 exports.getJobs = (req, res, next) => {
-    res.status(200).json(jobs);
+    const index = req.query.index;
+    const limit = req.query.limit;
+    const jobTypes = req.query.jobTypes;
+    const locations = req.query.locations;
+
+    const whereOptions = {};
+
+    if(jobTypes) whereOptions.title = { [Sequelize.Op.or]: req.query.jobTypes };
+    if(locations) whereOptions.location = { [Sequelize.Op.or]: req.query.locations };
+
+    // Return Jobs
+    Job.findAll({
+        where: whereOptions,
+        limit: parseInt(limit, 10),
+        offset: parseInt(index)
+    })
+    .then(response => {
+        res.status(200).json({
+            jobs: response,
+            message: `${response.length} ${response.length === 1? ' job':' jobs'} found`,
+            totalJobs: totalJobs
+        });
+    })
+    .catch(err => console.log(err));
+};
+
+exports.getMenuData = (req, res, next) => {
+    Job.findAll({
+        attributes: ['title', 'location'],
+        group: ['title', 'location']
+    })
+    // Job.aggregate('title', 'DISTINCT', { plain: false })
+    .then(response => {
+        const titles = response.map(job => job.dataValues.title);
+        const uniqueTitles = [...new Set(titles)];
+
+        const locations = response.map(location => location.dataValues.location);
+        const uniqueLocations = [...new Set(locations)];
+        
+        res.status(200).json({
+            response: { uniqueTitles, uniqueLocations }
+        })
+    })
+    .catch(err => console.log(err));
+};
+
+
+function countJobs() {
+    Job.findAll().then((jobs) => {
+        totalJobs = jobs.length;
+    })
+    .catch(err => console.log(err));
 };

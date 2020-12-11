@@ -6,7 +6,14 @@ const jobsController = require('../controllers/jobs');
 const router = express.Router();
 
 // GET /jobs/all
-router.get('/all', jobsController.getJobs);
+// #TODO: validate options object and index
+router.get('/all', 
+    [ body('limit').isInt().not().isEmpty() ],
+    jobsController.getJobs);
+
+// GET /jobs/menudata 
+router.get('/menudata', jobsController.getMenuData); 
+
 // GET /jobs/featured
 router.get('/featured', jobsController.getFeaturedJobs);
 
