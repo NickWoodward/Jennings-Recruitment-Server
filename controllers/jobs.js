@@ -62,21 +62,26 @@ exports.getFeaturedJobs = (req, res, next) => {
 
 // #TODO: Sanitise inputs?
 exports.getJobs = (req, res, next) => {
+    console.log(req.query.titles);
     const index = req.query.index;
     const limit = req.query.limit;
-    const jobTypes = req.query.jobTypes;
+    const titles = req.query.titles;
     const locations = req.query.locations;
+    const orderField = req.query.orderField;
+    const orderDirection = req.query.orderDirection;
+
 
     const whereOptions = {};
 
-    if(jobTypes) whereOptions.title = { [Sequelize.Op.or]: req.query.jobTypes };
-    if(locations) whereOptions.location = { [Sequelize.Op.or]: req.query.locations };
+    if(titles) whereOptions.title = { [Sequelize.Op.or]: titles};
+    if(locations) whereOptions.location = { [Sequelize.Op.or]: locations };
 
     // Return Jobs
     Job.findAll({
         where: whereOptions,
         limit: parseInt(limit, 10),
-        offset: parseInt(index)
+        offset: parseInt(index),
+        order: [[orderField, orderDirection]]
     })
     .then(response => {
         res.status(200).json({
