@@ -49,15 +49,15 @@ exports.createJob = (req, res, next) => {
 
 exports.getFeaturedJobs = (req, res, next) => {
 
-    Job.findAll({ where: { featured: true } })
-        .then(jobs => {
-            res.status(200).json({
-                jobs: jobs,
-                message: 'Featured jobs found'
-            });
-        })
-        .catch(err => console.log(err));
-
+    // Job.findAll({ where: { featured: true } })
+    //     .then(jobs => {
+    //         res.status(200).json({
+    //             jobs: jobs,
+    //             message: 'Featured jobs found'
+    //         });
+    //     })
+    //     .catch(err => console.log(err));
+    console.log('featured');
 };
 
 // #TODO: Sanitise inputs?
