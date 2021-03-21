@@ -11,7 +11,7 @@ const PRIV_KEY = fs.readFileSync(pathToKey, 'utf-8');
  * @param {*} user - The user object. Needed to set the JWT subject property to the user id 
  */
 
-exports.issueJWT = (user) => {
+exports.issueAccessToken = (user) => {
     const id = user.id;
     const expiresIn = '1h';
 

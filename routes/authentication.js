@@ -1,14 +1,21 @@
 const express = require('express');
+const { body } = require('express-validator');
+
 const router = express.Router();
-const passport = require('passport');
 
 const auth = require('../controllers/auth');
 
-router.post('/login', auth.login);
+router.post('/login', [
+    body('email')
+        .trim()
+        .isEmail()
+        .withMessage('Please enter an email address')
+        .normalizeEmail(),
+    body('password')
+        .trim()
+], auth.login);
 
-router.post('/register', auth.register);
-
-router.get('/test', passport.authenticate('jwt', { session: false }), (req, res, next) => {
+router.get('/test', (req, res, next) => {
     res.status(200).json({ success: true, message: 'fucking get in' });
 });
 

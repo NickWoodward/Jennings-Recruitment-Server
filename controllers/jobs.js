@@ -11,12 +11,12 @@ let totalJobs = countJobs();
     // #TODO: Move to admin controller
 exports.createJob = (req, res, next) => {
     const err = validationResult(req);
-
     if(!err.isEmpty()) {
-        return res.status(422)
-            .json({ 
-                message: 'Validation failed', errors: err.array()
-            });
+        const error = new Error('Validation failed, incorrect data');
+        error.validationErrors = err.array();
+        error.statusCode = 422;
+
+        throw error;
     }
 
     const title = req.body.title;
@@ -58,6 +58,26 @@ exports.getFeaturedJobs = (req, res, next) => {
     //     })
     //     .catch(err => console.log(err));
     console.log('featured');
+};
+
+exports.getJob = (req, res, next) => {
+    const errors = validationResult(req);
+    if(!errors.isEmpty()) {
+        const error = new Error('Validation failed, incorrect data');
+        error.statusCode = 422;
+        error.validationErrors = errors.array();
+
+        throw error;
+    }
+
+    Job.findByPk(req.params.id)
+        .then(job => {
+            if(job) return res.status(200).json({ message: "Job found", job });
+            throw new Error('Job not found');
+        }).catch(e => {
+            if(!e.statusCode) e.statusCode = 500; 
+            next(e);
+        });
 };
 
 // #TODO: Sanitise inputs?

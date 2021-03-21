@@ -1,21 +1,33 @@
 require('dotenv').config();
+const path = require('path');
+const { v4: uuidv4 } = require('uuid');
 
 const express = require('express');
 const bodyParser = require('body-parser');
-const passport = require('passport');
-
+const multer = require('multer');
 const sequelize = require('./util/database');
-const initializePassport = require('./config/passport');
-initializePassport(passport);
+
 
 const Job = require('./models/job');
 
 const jobRoutes = require('./routes/jobs');
 const authRoutes = require('./routes/authentication');
+const usersRoutes = require('./routes/users');
+
+const users = require('./controllers/users');
 
 const app = express();
+const fileStorage =  multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, 'cvs');    
+    },
+    filename: (req, file, cb) => {
+        cb(null, `${uuidv4()}.${file.originalname}`);
+    }
+});
 
 app.use(bodyParser.json());
+app.use('/cv', express.static(path.join(__dirname, 'cvs')));
 
 app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -24,10 +36,20 @@ app.use((req, res, next) => {
     next();
 });
 
-app.use(passport.initialize());
+// @TODO: remove passport
+// app.use(passport.initialize());
 
 app.use('/jobs', jobRoutes);
 app.use('/auth', authRoutes);
+app.use('/users', usersRoutes);
+
+app.use((error, req, res, next) => {
+    const status = error.statusCode || 500;
+    const message = error.message;
+    const validationErrors = error.validationErrors? error.validationErrors.map(({param, msg}) => { return {param, msg}}):[];
+
+    res.status(status).json({ message: `Caught in app.js ${message}`, validationErrors });
+});
 
 // sequelize.sync({force: true})
 sequelize.sync()
