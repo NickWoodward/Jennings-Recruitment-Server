@@ -11,8 +11,47 @@ router.get("/all", userController.getUsers);
 
 router.get("/:id", userController.getUser);
 
-router.post(
-    "/register",
+router.post("/edit/:id", [
+    body('firstName')
+    .trim()
+    .escape()
+    .isLength({ min: 2, max: 50 })
+    .withMessage('Must be between 2 and 50 characters'),
+    body('lastName')
+    .trim()
+    .escape()
+    .isLength({ min: 2, max: 50})
+    .withMessage('Must be between 2 and 50 characters'),
+    body('phone')
+    .trim()
+    .escape()
+    .isLength({ min: 9, max: 12 })
+    .withMessage('Must be between 9 and 12 characters')
+    .custom(value => {
+        const start = value.substring(0,2);
+        if(
+            start != '07' &&
+            start != '01' && 
+            start != '02' &&
+            start != '03' &&
+            start != '08'
+        ) throw new Error('Please enter a valid UK phone number');
+        
+        return true;
+    }),
+    // @TODO: Add validation to cvURL
+    // @TODO: Check if this needs escaping
+    body('email')
+    .trim()
+    .isEmail()
+    .withMessage('Please enter a valid email address')
+    .normalizeEmail()
+    .isLength({ max: 50 })
+],
+userController.editUser);
+
+// @TODO: cv validation
+router.post("/register",
     [
         body('firstName')
             .trim()
@@ -61,7 +100,7 @@ router.post(
             .trim()
             .isLength({ min: 12, max: 30 })
             .withMessage('Please enter a password between 12 and 30 characters'),
-        body('confirm')
+        body('confirmPassword')
             .trim()
             .isLength({ min: 12, max: 30 })
             .custom((value, { req }) => {
@@ -73,7 +112,7 @@ router.post(
     userController.registerUser
 );
 
-router.post("/delete/:id", [
+router.delete("/delete/:id", [
     param('id')
         .exists()
         .withMessage('Please provide an id')
@@ -86,5 +125,7 @@ router.post("/delete/:id", [
         .trim()
         .escape()
 ], userController.deleteUser);
+
+router.delete('/delete-email/:email', userController.deleteUserByEmail);
 
 module.exports = router;

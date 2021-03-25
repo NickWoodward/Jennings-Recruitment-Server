@@ -25,6 +25,9 @@ const fileStorage =  multer.diskStorage({
         cb(null, `${uuidv4()}.${file.originalname}`);
     }
 });
+// const fileFilter = (req, file, cb) => {
+//     if(file.mimetype === )
+// };
 
 app.use(bodyParser.json());
 app.use('/cv', express.static(path.join(__dirname, 'cvs')));
@@ -48,7 +51,7 @@ app.use((error, req, res, next) => {
     const message = error.message;
     const validationErrors = error.validationErrors? error.validationErrors.map(({param, msg}) => { return {param, msg}}):[];
 
-    res.status(status).json({ message: `Caught in app.js ${message}`, validationErrors });
+    res.status(status).json({ message: `Caught in app.js ${message}`, error: validationErrors });
 });
 
 // sequelize.sync({force: true})
