@@ -112,6 +112,7 @@ router.post("/register",
     userController.registerUser
 );
 
+// @TODO: remove validation from routes that don't need it
 router.delete("/delete/:id", [
     param('id')
         .exists()

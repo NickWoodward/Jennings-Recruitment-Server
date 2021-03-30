@@ -14,6 +14,7 @@ exports.editUser = (req, res, next) => {
     User.findByPk(req.params.id)
         .then(user => {
             if(user) {
+                console.log('oh no!');
                 user.firstName = req.body.firstName;
                 user.lastName = req.body.lastName;
                 user.phone = req.body.phone;
@@ -25,8 +26,9 @@ exports.editUser = (req, res, next) => {
                 res.status(404).json({ message: 'User not found' });
             }
         }).then(user => {
-            console.log(user);
-            res.status(200).json({ message: 'User edited' });
+            if(user){
+                res.status(200).json({ message: 'User edited' });
+            }
         })
         .catch(error => {
             if(!error.statusCode) {

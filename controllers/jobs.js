@@ -3,10 +3,40 @@ const Sequelize = require('sequelize');
 
 
 const Job = require('../models/job');
-const { json } = require('body-parser');
-const { where } = require('sequelize');
+
 
 let totalJobs = countJobs();
+
+exports.editJob = (req, res, next) => {
+    const errors = validationResult(req);
+    if(!errors.isEmpty()) {
+        const error = new Error('Validation error');
+        error.statusCode = 422;
+        error.validationArray = errors.array();
+        throw error;
+    }
+    Job.findByPk(req.params.id)
+        .then(job => {
+            if(job) {
+                job.title = req.body.title;
+                job.wage = req.body.wage;
+                job.location = req.body.location;
+                job.description = req.body.description;
+
+                return job.save();
+            } else {
+                res.status(400).json({ message: 'Job not found' });
+            }
+        })
+        .then(job => {
+            if(job)
+                res.status(200).json({ message: 'Job updated', job });
+        })
+        .catch(err => {
+            if(!err.statusCode) err.statusCode = 500;
+            next(err);
+        });
+};
 
     // #TODO: Move to admin controller
 exports.createJob = (req, res, next) => {
@@ -32,11 +62,13 @@ exports.createJob = (req, res, next) => {
         description: description,
         featured: featured
     })
-    .then(result => {
+    .then(job => {
+        const jobId = job.dataValues.id;
+        const createdAt = job.dataValues.createdAt;
         totalJobs++;
         res.status(201).json({
             message: 'Job created sucessfully',
-            job: { id: new Date().toISOString(), title: title, wage: wage, location: location, description: description, featured: featured }
+            job: { id: jobId, title: title, wage: wage, location: location, description: description, createdAt: createdAt }
         });
     })
     .catch(err => {
@@ -45,6 +77,24 @@ exports.createJob = (req, res, next) => {
             message: 'Please contact your administrator'
         });
     });
+};
+
+exports.deleteJob = (req, res, next) => {
+    Job.findByPk(req.params.id)
+        .then(job => {
+            if(job) {
+                return job.destroy();
+            } else {
+                res.status(404).json({ message: 'Cannot find job' });
+            }
+        })
+        .then(response => {
+            if(response) res.status(200).json({ message: 'Job deleted', job: response.dataValues})
+        })
+        .catch(err => {
+            if(!err.statusCode) err.statusCode = 500;
+            next(err);
+        });
 };
 
 exports.getFeaturedJobs = (req, res, next) => {
