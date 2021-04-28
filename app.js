@@ -1,5 +1,6 @@
 require('dotenv').config();
 const path = require('path');
+// @TODO replace with nanoid
 const { v4: uuidv4 } = require('uuid');
 
 const express = require('express');
@@ -7,14 +8,15 @@ const bodyParser = require('body-parser');
 const multer = require('multer');
 const sequelize = require('./util/database');
 
-
 const Job = require('./models/job');
 
 const jobRoutes = require('./routes/jobs');
 const authRoutes = require('./routes/authentication');
 const usersRoutes = require('./routes/users');
+const messagingRoutes = require('./routes/messaging');
 
 const users = require('./controllers/users');
+const twilio = require('./util/twilio');
 
 const app = express();
 const fileStorage =  multer.diskStorage({
@@ -30,6 +32,7 @@ const fileStorage =  multer.diskStorage({
 // };
 
 app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: false }));
 app.use('/cv', express.static(path.join(__dirname, 'cvs')));
 
 app.use((req, res, next) => {
@@ -45,6 +48,7 @@ app.use((req, res, next) => {
 app.use('/jobs', jobRoutes);
 app.use('/auth', authRoutes);
 app.use('/users', usersRoutes);
+app.use('/sms', messagingRoutes);
 
 app.use((error, req, res, next) => {
     const status = error.statusCode || 500;
@@ -57,9 +61,29 @@ app.use((error, req, res, next) => {
 // sequelize.sync({force: true})
 sequelize.sync()
     .then(result => {
-        app.listen(8080);
+        const server = app.listen(8080);
+        const io = require('./util/socket').init(server);
+        io.on('connection', socket => {
+            console.log('connection');
+            socket.on('chatbox', (data) => {
+                twilio.sendSMS(data, socket.id);
+                // reply(socket, data);
+            });
+            socket.on('disconnect', () => {
+                console.log('disconnected');
+                twilio.deleteConversation(socket.id);
+            })
+        });
+        
     })
     .catch(err => {
         console.log(err);
     });
+
+    const reply = (socket, data) => {
+        socket.emit('response', { 
+            user: socket.id, 
+            message: `This is the server. You sent me: "${data}"` 
+        });
+    }
 

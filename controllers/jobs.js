@@ -3,6 +3,7 @@ const Sequelize = require('sequelize');
 
 
 const Job = require('../models/job');
+const io = require('../util/socket');
 
 
 let totalJobs = countJobs();
@@ -53,7 +54,7 @@ exports.createJob = (req, res, next) => {
     const wage = req.body.wage;
     const location = req.body.location;
     const description = req.body.description;
-    const featured = true;
+    const featured = false;
     
     Job.create({
         title: title,
@@ -66,6 +67,9 @@ exports.createJob = (req, res, next) => {
         const jobId = job.dataValues.id;
         const createdAt = job.dataValues.createdAt;
         totalJobs++;
+
+        io.getIO().emit('job', { action: 'create', job: {jobId, title, wage, location} });
+
         res.status(201).json({
             message: 'Job created sucessfully',
             job: { id: jobId, title: title, wage: wage, location: location, description: description, createdAt: createdAt }
@@ -99,15 +103,14 @@ exports.deleteJob = (req, res, next) => {
 
 exports.getFeaturedJobs = (req, res, next) => {
 
-    // Job.findAll({ where: { featured: true } })
-    //     .then(jobs => {
-    //         res.status(200).json({
-    //             jobs: jobs,
-    //             message: 'Featured jobs found'
-    //         });
-    //     })
-    //     .catch(err => console.log(err));
-    console.log('featured');
+    Job.findAll({ where: { featured: true } })
+        .then(jobs => {
+            res.status(200).json({
+                jobs: jobs,
+                message: 'Featured jobs found'
+            });
+        })
+        .catch(err => console.log(err));
 };
 
 exports.getJob = (req, res, next) => {
@@ -130,7 +133,6 @@ exports.getJob = (req, res, next) => {
         });
 };
 
-// #TODO: Sanitise inputs?
 exports.getJobs = (req, res, next) => {
     console.log(req.query.titles);
     const index = req.query.index;
@@ -139,7 +141,6 @@ exports.getJobs = (req, res, next) => {
     const locations = req.query.locations;
     const orderField = req.query.orderField;
     const orderDirection = req.query.orderDirection;
-
 
     const whereOptions = {};
 
@@ -164,6 +165,7 @@ exports.getJobs = (req, res, next) => {
 };
 
 exports.getMenuData = (req, res, next) => {
+    console.log('called');
     Job.findAll({
         attributes: ['title', 'location'],
         group: ['title', 'location']

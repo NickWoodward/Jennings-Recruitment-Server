@@ -11,6 +11,13 @@ router.get('/all',
     [ body('limit').isInt().not().isEmpty() ],
     jobsController.getJobs);
 
+// GET /jobs/menudata 
+router.get('/menudata', jobsController.getMenuData); 
+
+// GET /jobs/featured
+router.get('/featured', jobsController.getFeaturedJobs);
+
+
 // GET /jobs/:id
 router.get('/:id', [
     param('id')
@@ -26,11 +33,7 @@ router.get('/:id', [
         .escape()
 ], jobsController.getJob);
 
-// GET /jobs/menudata 
-router.get('/menudata', jobsController.getMenuData); 
 
-// GET /jobs/featured
-router.get('/featured', jobsController.getFeaturedJobs);
 
 // POST /jobs/create
 router.post('/create', [

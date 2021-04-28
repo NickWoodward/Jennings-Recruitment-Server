@@ -1,7 +1,46 @@
 const bcrypt = require('bcrypt');
 const { validationResult } = require('express-validator');
+const hubspot = require('../util/hubspot');
 
 const User = require('../models/user');
+
+exports.addToHubspot = (req, res, next) => {
+    // const user = {
+    //     fname: req.body.firstName,
+    //     surname: req.body.lastName,
+    //     phone: req.body.phone,
+    //     email: req.body.email,
+
+    // }
+    const id = req.params.id;
+    console.log('hello');
+    User.findByPk(id)
+        .then(user => {
+            if(user) {
+                const { firstName, lastName, email, phone } = user;
+
+                // console.log(JSON.stringify(user));
+                return hubspot.createUser(firstName, lastName, email, phone );         
+            }
+        })
+        .then(response => {
+            const data = response.response;
+            console.log(JSON.stringify(data.body));
+            console.log(response.IncomingMessage);
+
+            if(data.statusCode === 201) {
+                res.status(201).json({ msg: 'User created', data });
+            } else if(data.statusCode === 409) {
+
+            } else {
+                res.status(404).json({ msg: 'User not found' });
+            }
+        })
+        .catch(err => console.log(JSON.stringify(err)));
+
+    
+        
+};
 
 exports.editUser = (req, res, next) => {
     const errors = validationResult(req);
@@ -14,7 +53,6 @@ exports.editUser = (req, res, next) => {
     User.findByPk(req.params.id)
         .then(user => {
             if(user) {
-                console.log('oh no!');
                 user.firstName = req.body.firstName;
                 user.lastName = req.body.lastName;
                 user.phone = req.body.phone;
