@@ -17,6 +17,8 @@ const messagingRoutes = require('./routes/messaging');
 
 const users = require('./controllers/users');
 const twilio = require('./util/twilio');
+const sendGrid = require('./util/sendGrid');
+const conversations = require('./controllers/conversations');
 
 const app = express();
 const fileStorage =  multer.diskStorage({
@@ -67,11 +69,12 @@ sequelize.sync()
             console.log('connection');
             socket.on('chatbox', (data) => {
                 twilio.sendSMS(data, socket.id);
+                sendGrid.sendEmail(data);
                 // reply(socket, data);
             });
             socket.on('disconnect', () => {
                 console.log('disconnected');
-                twilio.deleteConversation(socket.id);
+                conversations.deleteConversation(socket.id);
             })
         });
         
