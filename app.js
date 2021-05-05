@@ -7,6 +7,10 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const multer = require('multer');
 const sequelize = require('./util/database');
+// const cookieParser = require('cookie-parser');
+const session = require('express-session');
+const MySQLStore = require('express-mysql-session')(session);
+
 
 const Job = require('./models/job');
 
@@ -33,12 +37,23 @@ const fileStorage =  multer.diskStorage({
 //     if(file.mimetype === )
 // };
 
+const store = new MySQLStore({
+    host: process.env.DB_HOST,
+    port: process.env.DB_PORT,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_DATABASE
+});
+
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
+// app.use(cookieParser());
+app.use(session({secret: process.env.SESSION_SECRET, resave: false, saveUninitialized: false, store: store}));
 app.use('/cv', express.static(path.join(__dirname, 'cvs')));
 
 app.use((req, res, next) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Origin', 'http://localhost:8081');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     next();

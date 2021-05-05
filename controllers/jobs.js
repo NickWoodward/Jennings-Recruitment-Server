@@ -102,6 +102,11 @@ exports.deleteJob = (req, res, next) => {
 };
 
 exports.getFeaturedJobs = (req, res, next) => {
+    console.log(req.session.isLoggedIn);
+
+    console.log('User: ' + req.session.user);
+    console.log('Session: ' + JSON.stringify(req.session));
+
 
     Job.findAll({ where: { featured: true } })
         .then(jobs => {
@@ -134,9 +139,10 @@ exports.getJob = (req, res, next) => {
 };
 
 exports.getJobs = (req, res, next) => {
-    console.log(req.query.titles);
-    const index = req.query.index;
-    const limit = req.query.limit;
+    console.log(req.session.isLoggedIn);
+    console.log(req.session.user);
+    const index = req.query.index || 0;
+    const limit = req.query.limit || 10;
     const titles = req.query.titles;
     const locations = req.query.locations;
     const orderField = req.query.orderField;
@@ -152,7 +158,7 @@ exports.getJobs = (req, res, next) => {
         where: whereOptions,
         limit: parseInt(limit, 10),
         offset: parseInt(index),
-        order: [[orderField, orderDirection]]
+        // order: [[orderField, orderDirection]]
     })
     .then(response => {
         res.status(200).json({

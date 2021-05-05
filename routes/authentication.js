@@ -13,7 +13,9 @@ router.post('/login', [
         .normalizeEmail(),
     body('password')
         .trim()
-], auth.login);
+], auth.loginAdmin);
+
+router.post('/logout', auth.logoutAdmin);
 
 router.get('/test', (req, res, next) => {
     res.status(200).json({ success: true, message: 'fucking get in' });
