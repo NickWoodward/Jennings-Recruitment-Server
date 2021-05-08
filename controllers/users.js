@@ -154,6 +154,8 @@ exports.registerUser = async(req, res, next) => {
 
     try {
         const hashedPassword = await bcrypt.hash(req.body.password, 10);
+        // @TODO: check mysql unique logic, if not working, search for existing user/email 
+
         // Create new user
         const user = await User.create({
             firstName: req.body.firstName,

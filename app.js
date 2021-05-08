@@ -7,7 +7,6 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const multer = require('multer');
 const sequelize = require('./util/database');
-// const cookieParser = require('cookie-parser');
 const session = require('express-session');
 const MySQLStore = require('express-mysql-session')(session);
 
@@ -47,8 +46,8 @@ const store = new MySQLStore({
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
-// app.use(cookieParser());
-app.use(session({secret: process.env.SESSION_SECRET, resave: false, saveUninitialized: false, store: store}));
+// @TODO: Note that Nginx proxying might require the use of 'app.set('trust proxy', 1)' in express.
+app.use(session({secret: process.env.SESSION_SECRET, resave: false, saveUninitialized: false, store: store, cookie: {secure: process.env.NODE_ENV === 'production'? true: false} }));
 app.use('/cv', express.static(path.join(__dirname, 'cvs')));
 
 app.use((req, res, next) => {

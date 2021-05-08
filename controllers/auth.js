@@ -6,12 +6,16 @@ const utils = require('../util/utils');
 
 // @TODO: check cookie is secure/httpOnly
 exports.loginAdmin = (req, res, next) => {
-    console.log('logging in');
-    req.session.isLoggedIn = true;
-    User.findOne({ where: { email: 'nickwoodward@hotmaill.com' } }).then(result => {
-        req.session.user = result
-        res.status(200).json({msg: 'logged in', isLoggedIn: req.session.isLoggedIn});
+    User.findOne({ where: { email: 'nickwoodward@hotmail.com' } }).then(result => {
 
+        if(result) {
+
+            req.session.user = `${result.firstName} ${result.lastName}`;
+            req.session.save(err => {
+                console.log(err);
+                res.status(200).json({msg: 'logged in'});
+            });
+        }
     })
     .catch(err => console.log(err));
 };
