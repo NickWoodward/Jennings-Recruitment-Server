@@ -1,7 +1,7 @@
 const bcrypt = require('bcrypt');
 const { validationResult } = require('express-validator');
 
-const User = require('../models/user');
+const User = require('../models/person');
 const utils = require('../util/utils');
 
 // @TODO: check cookie is secure/httpOnly

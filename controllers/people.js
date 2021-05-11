@@ -2,7 +2,7 @@ const bcrypt = require('bcrypt');
 const { validationResult } = require('express-validator');
 const hubspot = require('../util/hubspot');
 
-const User = require('../models/user');
+const User = require('../models/person');
 
 exports.addToHubspot = (req, res, next) => {
     // const user = {

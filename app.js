@@ -11,14 +11,21 @@ const session = require('express-session');
 const MySQLStore = require('express-mysql-session')(session);
 
 
+// MODELS
 const Job = require('./models/job');
+const Person = require('./models/person');
+const Company = require('./models/company');
+const Contact = require('./models/contacts');
+const Applicant = require('./models/applicant');
+const Application = require('./models/application');
 
+// ROUTES
 const jobRoutes = require('./routes/jobs');
 const authRoutes = require('./routes/authentication');
 const usersRoutes = require('./routes/users');
 const messagingRoutes = require('./routes/messaging');
 
-const users = require('./controllers/users');
+// COMMUNICATION APIs
 const twilio = require('./util/twilio');
 const sendGrid = require('./util/sendGrid');
 const conversations = require('./controllers/conversations');
@@ -68,15 +75,32 @@ app.use('/sms', messagingRoutes);
 
 app.use((error, req, res, next) => {
     const status = error.statusCode || 500;
-    const message = error.message;
+    const message = (status === 500 && process.env.NODE_ENV !== 'development' )? 'Please contact us directly':error.message;
     const validationErrors = error.validationErrors? error.validationErrors.map(({param, msg}) => { return {param, msg}}):[];
 
     res.status(status).json({ message: `Caught in app.js ${message}`, error: validationErrors });
 });
 
+// SET UP ASSOCIATIONS
+    // Companies 1:M Jobs, Job has mandatory fk
+    Company.hasMany(Job, { foreignKey: { name: 'companyId', allowNull: false } });
+    Job.belongsTo(Company, { foreignKey: { name: 'companyId', allowNull: false } });
+
+    // Applicant is a subtype of Person
+    Person.hasOne(Applicant, { foreignKey: { name: 'personId', allowNull: false, unique: true } });
+    Applicant.belongsTo(Person, { foreignKey: { name: 'personId', allowNull: false, unique: true } });
+
+    // Applicants M:N Jobs (through Application)
+    Applicant.belongsToMany(Job, { through: Application });
+    Job.belongsToMany(Applicant, { through: Application });
+
+    // Person M:N Company (through Contact)
+    Person.belongsToMany(Company, { through: Contact });
+    Company.belongsToMany(Person, { through: Contact });
+
 // sequelize.sync({force: true})
-sequelize.sync()
-    .then(result => {
+sequelize.sync({force: true})
+    .then(async result => {
         const server = app.listen(8080);
         const io = require('./util/socket').init(server);
         io.on('connection', socket => {
@@ -92,6 +116,37 @@ sequelize.sync()
             })
         });
         
+        // Testing:
+
+        // JOB:COMPANY association
+        const JRS = await Company.create({ name: 'JRS',  address: 'Somewhere in Devon'});
+        const woodwork = await Company.create({ name: 'WoodWork', address: 'Devizes' });
+        const jobOne = await Job.create({ title: 'Head of Legal', wage: 80000, location: 'Bristol', description: 'A test job', featured: true, companyId: JRS.id });
+        const jobTwo = await Job.create({ title: 'Head of Legal', wage: 100000, location: 'Reading', description: 'A test job', featured: true, companyId: woodwork.id});
+
+        // Deletes the job associated with company too
+        // await JRS.destroy();
+
+        // PERSON:APPLICANT association
+        const personOne = await Person.create({ firstName: 'Nick', lastName: 'Woodward', phone: '074843732635', email: 'nickwoodward@gmail.com' });
+        const applicantOne = await Applicant.create({ personId: personOne.id, cvUrl: 'thisismycv.doc' });
+        const personTwo = await Person.create({ firstName: 'Will', lastName: 'Woodward', phone: '074843732635', email: 'willwoodward@gmail.com' });
+        const applicantTwo = await Applicant.create({ personId: personTwo.id });
+
+        // Will delete both the person and the associated applicant
+        // await personTwo.destroy();
+
+        // APPLICANT:JOB association (through applications)
+        await jobTwo.addApplicant(applicantOne);
+        await jobOne.addApplicant(applicantTwo);
+        // await jobTwo.addApplicant(applicantTwo);
+
+        // const applicationOne = await Application.findOne({ where: { applicantId: applicantOne.id, jobId: jobTwo.id } });
+        // applicationOne.destroy();
+
+        // PERSON:COMPANY association (through contacts)
+        personOne.addCompany(JRS, { through: { position: 'Head of sales' } });
+
     })
     .catch(err => {
         console.log(err);
