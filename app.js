@@ -18,11 +18,14 @@ const Company = require('./models/company');
 const Contact = require('./models/contacts');
 const Applicant = require('./models/applicant');
 const Application = require('./models/application');
+const Address = require('./models/address');
 
 // ROUTES
 const jobRoutes = require('./routes/jobs');
 const authRoutes = require('./routes/authentication');
 const usersRoutes = require('./routes/users');
+const applicationRoutes = require('./routes/applications');
+const companyRoutes = require('./routes/companies');
 const messagingRoutes = require('./routes/messaging');
 
 // COMMUNICATION APIs
@@ -71,7 +74,10 @@ app.use((req, res, next) => {
 app.use('/jobs', jobRoutes);
 app.use('/auth', authRoutes);
 app.use('/users', usersRoutes);
+app.use('/applications', applicationRoutes);
+app.use('/companies', companyRoutes);
 app.use('/sms', messagingRoutes);
+
 
 app.use((error, req, res, next) => {
     const status = error.statusCode || 500;
@@ -86,6 +92,10 @@ app.use((error, req, res, next) => {
     Company.hasMany(Job, { foreignKey: { name: 'companyId', allowNull: false } });
     Job.belongsTo(Company, { foreignKey: { name: 'companyId', allowNull: false } });
 
+    // Address M:N Companies
+    Company.belongsToMany(Address, { through: 'CompanyAddress' });
+    Address.belongsToMany(Company, { through: 'CompanyAddress' });
+
     // Applicant is a subtype of Person
     Person.hasOne(Applicant, { foreignKey: { name: 'personId', allowNull: false, unique: true } });
     Applicant.belongsTo(Person, { foreignKey: { name: 'personId', allowNull: false, unique: true } });
@@ -99,7 +109,7 @@ app.use((error, req, res, next) => {
     Company.belongsToMany(Person, { through: Contact });
 
 // sequelize.sync({force: true})
-sequelize.sync({force: true})
+sequelize.sync()
     .then(async result => {
         const server = app.listen(8080);
         const io = require('./util/socket').init(server);
@@ -118,34 +128,40 @@ sequelize.sync({force: true})
         
         // Testing:
 
-        // JOB:COMPANY association
-        const JRS = await Company.create({ name: 'JRS',  address: 'Somewhere in Devon'});
-        const woodwork = await Company.create({ name: 'WoodWork', address: 'Devizes' });
-        const jobOne = await Job.create({ title: 'Head of Legal', wage: 80000, location: 'Bristol', description: 'A test job', featured: true, companyId: JRS.id });
-        const jobTwo = await Job.create({ title: 'Head of Legal', wage: 100000, location: 'Reading', description: 'A test job', featured: true, companyId: woodwork.id});
+        // // JOB:COMPANY association
+        // const JRS = await Company.create({ name: 'JRS',  address: 'Somewhere in Devon'});
+        // const woodwork = await Company.create({ name: 'WoodWork', address: 'Devizes' });
+        // const jobOne = await Job.create({ title: 'Job 1', wage: 80000, location: 'Bristol', description: 'A test job', featured: true, companyId: JRS.id });
+        // const jobTwo = await Job.create({ title: 'Job 2', wage: 100000, location: 'Reading', description: 'A test job', featured: true, companyId: woodwork.id});
 
-        // Deletes the job associated with company too
-        // await JRS.destroy();
+        // const address1 = await Address.create({ firstLine: 'Kemp House', secondLine: '152 City Road', city: 'London', county: 'Greater London', postcode: 'EC1V 2NX' });
+        // const address2 = await Address.create({ firstLine: 'Forge House', secondLine: 'Rushall', city: 'Pewsey', county: 'Wiltshire', postcode: 'SN9 6EN' });
+        // JRS.addAddress(address1);
+        // JRS.addAddress(address2);
 
-        // PERSON:APPLICANT association
-        const personOne = await Person.create({ firstName: 'Nick', lastName: 'Woodward', phone: '074843732635', email: 'nickwoodward@gmail.com' });
-        const applicantOne = await Applicant.create({ personId: personOne.id, cvUrl: 'thisismycv.doc' });
-        const personTwo = await Person.create({ firstName: 'Will', lastName: 'Woodward', phone: '074843732635', email: 'willwoodward@gmail.com' });
-        const applicantTwo = await Applicant.create({ personId: personTwo.id });
+        // // Deletes the job associated with company too
+        // // await JRS.destroy();
 
-        // Will delete both the person and the associated applicant
-        // await personTwo.destroy();
+        // // PERSON:APPLICANT association
+        // const personOne = await Person.create({ firstName: 'Nick', lastName: 'Woodward', phone: '074843732635', email: 'nickwoodward@gmail.com' });
+        // const applicantOne = await Applicant.create({ personId: personOne.id, cvUrl: 'thisismycv.doc' });
+        // const personTwo = await Person.create({ firstName: 'Will', lastName: 'Woodward', phone: '074843732635', email: 'willwoodward@gmail.com' });
+        // const applicantTwo = await Applicant.create({ personId: personTwo.id });
 
-        // APPLICANT:JOB association (through applications)
-        await jobTwo.addApplicant(applicantOne);
-        await jobOne.addApplicant(applicantTwo);
+        // // Will delete both the person and the associated applicant
+        // // await personTwo.destroy();
+
+        // // APPLICANT:JOB association (through applications)
+        // await jobTwo.addApplicant(applicantOne);
+        // await jobOne.addApplicant(applicantTwo);
         // await jobTwo.addApplicant(applicantTwo);
+        // // await jobTwo.addApplicant(applicantTwo);
 
-        // const applicationOne = await Application.findOne({ where: { applicantId: applicantOne.id, jobId: jobTwo.id } });
-        // applicationOne.destroy();
+        // const applicationThree = await Application.findOne({ where: { applicantId: applicantTwo.id, jobId: jobTwo.id } });
+        // // applicationThree.destroy();
 
-        // PERSON:COMPANY association (through contacts)
-        personOne.addCompany(JRS, { through: { position: 'Head of sales' } });
+        // // PERSON:COMPANY association (through contacts)
+        // personOne.addCompany(JRS, { through: { position: 'Head of sales' } });
 
     })
     .catch(err => {

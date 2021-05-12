@@ -8,8 +8,10 @@ const User = require('../models/person');
 const router = express.Router();
 
 router.get("/all", userController.getUsers);
+router.get("/headers", userController.getUserHeaders);
 
 router.get("/:id", userController.getUser);
+
 
 router.post("/edit/:id", [
     body('firstName')

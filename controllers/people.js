@@ -143,6 +143,14 @@ exports.getUser = (req, res, next) => {
         });
 };
 
+exports.getUserHeaders = (req, res, next) => {
+    const result = [];
+    for(let key in User.rawAttributes) {
+        result.push(key);
+    }
+    res.status(200).json({msg: 'success', headers: result});
+};
+
 exports.registerUser = async(req, res, next) => {
     const errors = validationResult(req);
     if(!errors.isEmpty()) {

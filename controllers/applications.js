@@ -3,6 +3,9 @@ const Job = require('../models/job');
 const Person = require('../models/person');
 const Applicant = require('../models/applicant');
 const Application = require('../models/application');
+const Company = require('../models/company');
+
+const util = require('util');
 
 exports.apply = (req, res, next) => {
     const errors = validationResult(req);
@@ -89,4 +92,42 @@ exports.apply = (req, res, next) => {
             console.log(err);
             next(err)
         });
+};
+
+exports.getApplications = (req, res, next) => {
+    // Application.findAll()
+    //     .then(applications => {
+    //         console.log(applications[0].dataValues);
+
+    //         res.status(200).json({applications: applications});
+    //     })
+    // .catch(err => console.log(err)); 
+
+    // Use the {include} option to get the relavant model for each job rather than querying the Application table
+    Job.findAll({ 
+        include: [
+            {
+                model: Applicant, 
+                include: { model: Person },
+               
+                // order: [ [Applicant,  'applicantId', 'DESC'] ]
+
+            },
+            Company
+        ], 
+        order: [ [ Applicant, Application,  'createdAt', 'DESC'] ]
+
+    }).then(results => {
+        // For each job, create an entry for each applicant to that job
+
+        const jobEntries = results.map(({ dataValues, dataValues: { company: {name: companyName}, id: jobId, title, applicants } }, index) => {
+            // console.log(`${index} >`, util.inspect(dataValues, true, 3, true));
+
+            const application = applicants.map(({ cvUrl, id:applicantId, personId, person: { firstName, lastName } }) =>  { 
+                return { company: companyName, jobId, applicantId, position: title, personId, firstName, lastName, cvUrl } 
+            });
+            return application
+        }).flat();
+        res.status(200).json({msg: 'success', applications: jobEntries});
+    }).catch(err => console.log(err));
 };
