@@ -1,14 +1,12 @@
 require('dotenv').config();
 const path = require('path');
-// @TODO replace with nanoid
-const { v4: uuidv4 } = require('uuid');
 
 const express = require('express');
 const bodyParser = require('body-parser');
-const multer = require('multer');
 const sequelize = require('./util/database');
 const session = require('express-session');
 const MySQLStore = require('express-mysql-session')(session);
+const cors = require('cors');
 
 
 // MODELS
@@ -27,6 +25,7 @@ const usersRoutes = require('./routes/users');
 const applicationRoutes = require('./routes/applications');
 const companyRoutes = require('./routes/companies');
 const messagingRoutes = require('./routes/messaging');
+const adminRoutes = require('./routes/admin');
 
 // COMMUNICATION APIs
 const twilio = require('./util/twilio');
@@ -34,17 +33,7 @@ const sendGrid = require('./util/sendGrid');
 const conversations = require('./controllers/conversations');
 
 const app = express();
-const fileStorage =  multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, 'cvs');    
-    },
-    filename: (req, file, cb) => {
-        cb(null, `${uuidv4()}.${file.originalname}`);
-    }
-});
-// const fileFilter = (req, file, cb) => {
-//     if(file.mimetype === )
-// };
+
 
 const store = new MySQLStore({
     host: process.env.DB_HOST,
@@ -58,13 +47,13 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 // @TODO: Note that Nginx proxying might require the use of 'app.set('trust proxy', 1)' in express.
 app.use(session({secret: process.env.SESSION_SECRET, resave: false, saveUninitialized: false, store: store, cookie: {secure: process.env.NODE_ENV === 'production'? true: false} }));
-app.use('/cv', express.static(path.join(__dirname, 'cvs')));
 
 app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', 'http://localhost:8081');
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Authorization, Accept');
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
     next();
 });
 
@@ -77,10 +66,12 @@ app.use('/users', usersRoutes);
 app.use('/applications', applicationRoutes);
 app.use('/companies', companyRoutes);
 app.use('/sms', messagingRoutes);
+app.use('/admin', adminRoutes);
 
 
 app.use((error, req, res, next) => {
     const status = error.statusCode || 500;
+    console.log(error.message);
     const message = (status === 500 && process.env.NODE_ENV !== 'development' )? 'Please contact us directly':error.message;
     const validationErrors = error.validationErrors? error.validationErrors.map(({param, msg}) => { return {param, msg}}):[];
 

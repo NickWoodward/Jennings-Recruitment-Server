@@ -1,6 +1,7 @@
 const bcrypt = require('bcrypt');
 const { validationResult } = require('express-validator');
 const hubspot = require('../util/hubspot');
+const Sequelize = require('sequelize');
 
 const User = require('../models/person');
 
@@ -13,7 +14,6 @@ exports.addToHubspot = (req, res, next) => {
 
     // }
     const id = req.params.id;
-    console.log('hello');
     User.findByPk(id)
         .then(user => {
             if(user) {
@@ -114,7 +114,15 @@ exports.deleteUserByEmail = (req, res, next) => {
 }
 
 exports.getUsers = (req, res, next) => {
-    User.findAll({ attributes: [ 'id', 'firstName', 'lastName', 'phone', 'email', 'createdAt' ] })
+    User.findAll({ 
+        attributes: [ 
+            'id', 
+            'firstName', 
+            'lastName', 
+            'phone', 
+            'email', 
+            [Sequelize.fn('date_format', Sequelize.col('createdAt' ), '%d/%m/%y'), 'createdAt']
+        ] })
         .then(users => {
             if(users) {
                 return res.status(200).json({ users });

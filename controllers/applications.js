@@ -16,13 +16,18 @@ exports.apply = (req, res, next) => {
         error.validationArray = errors.array();
         throw error;
     }
+    // if(!req.file) {
+    //     const error = new Error('No cv provided');
+    //     error.statusCode = 422;
+    //     throw error;
+    // }
 
     const jobId = req.params.id;
     const firstName = req.body.firstName;
     const lastName = req.body.lastName;
     const phone = req.body.phone;
     const email = req.body.email;
-    const cvUrl = req.body.cvUrl;
+    const cvUrl = req.file? req.file.filename : null;
 
     let currentPerson;
     let currentApplicant;
@@ -59,7 +64,7 @@ exports.apply = (req, res, next) => {
         .then(applicant => {
             // Create an applicant if they don't exist
             if(!applicant) {
-                return Applicant.create({ personId: currentPerson.id });
+                return Applicant.create({ personId: currentPerson.id, cvUrl });
             } else {
                 return applicant;
             }
@@ -119,12 +124,15 @@ exports.getApplications = (req, res, next) => {
 
     }).then(results => {
         // For each job, create an entry for each applicant to that job
+        // console.log(`>`, util.inspect(results[0], true, 1, true));
+        // console.log(Object.keys(results[0].__proto__));
 
-        const jobEntries = results.map(({ dataValues, dataValues: { company: {name: companyName}, id: jobId, title, applicants } }, index) => {
-            // console.log(`${index} >`, util.inspect(dataValues, true, 3, true));
 
-            const application = applicants.map(({ cvUrl, id:applicantId, personId, person: { firstName, lastName } }) =>  { 
-                return { company: companyName, jobId, applicantId, position: title, personId, firstName, lastName, cvUrl } 
+        const jobEntries = results.map(({ dataValues, dataValues: { company: {name: companyName, id: companyId}, id: jobId, title, applicants } }, index) => {
+            // console.log(`${index}>`, util.inspect(applicants[0], true, 2, true));
+
+            const application = applicants.map(({ cvUrl, id:applicantId, personId, person: { firstName, lastName }, application: {id:applicationId} }) =>  { 
+                return { company: companyName, companyId, applicationId, jobId, applicantId, position: title, personId, firstName, lastName, cvUrl } 
             });
             return application
         }).flat();
