@@ -6,4 +6,6 @@ const adminController = require('../controllers/admin');
 router.get('/applicants', adminController.getApplicants);
 router.get('/cvs/:applicantId', adminController.getCv);
 
+router.post('/applicants/:id', adminController.editApplicant)
+
 module.exports = router;

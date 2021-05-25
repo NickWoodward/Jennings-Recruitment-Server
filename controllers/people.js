@@ -114,6 +114,7 @@ exports.deleteUserByEmail = (req, res, next) => {
 }
 
 exports.getUsers = (req, res, next) => {
+
     User.findAll({ 
         attributes: [ 
             'id', 

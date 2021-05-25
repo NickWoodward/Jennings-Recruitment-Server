@@ -8,9 +8,59 @@ const Person = require('../models/person');
 const Job = require('../models/job');
 const Company = require('../models/company');
 
+
+exports.editApplicant = (req, res, next) =>{
+    console.log(req.params);
+    Applicant.findByPk(req.params.id, {
+        include: Person
+    }).then(applicant => {
+            if(!applicant) { 
+                const error = new Error();
+                error.message = 'No User Found';
+                error.statusCode = 404;
+                next(error);
+            }
+            const person = applicant.person;
+
+            if(!person) {
+                const error = new Error();
+                error.message = 'No Person Found';
+                error.statusCode = 404;
+            }
+
+            person.firstName = req.body.firstName;
+            person.lastName = req.body.lastName;
+            person.phone = req.body.phone;
+            person.email = req.body.email;
+            console.log(req.cv);
+            console.log(req.body);
+            // console.log(req);
+            if(req.cv) {
+                // check the cv is the same as the stored one
+            }            
+
+
+            // return res.save();
+        }).then(result => {
+            res.status(200).json({ result });
+        })
+        .catch(err => {
+            console.log(err);
+        });
+};
+
+const deleteCv = (filePath) => {
+
+}; 
+
 exports.getApplicants = (req, res, next) => {
 
-    Applicant.findAll({
+    const index = req.query.index || 0;
+    const limit = req.query.limit || 10;
+
+    Applicant.findAndCountAll({
+        limit: parseInt(limit, 10),
+        offset: parseInt(index),
         attributes: [
             'id',
             'cvUrl',
@@ -36,7 +86,7 @@ exports.getApplicants = (req, res, next) => {
     })
         .then(applicants => {
             if(applicants) {
-                applicants = applicants.map(({ 
+                applicants.rows = applicants.rows.map(({ 
                     id:applicantId, 
                     createdAt, 
                     jobs,
@@ -44,19 +94,20 @@ exports.getApplicants = (req, res, next) => {
                     cvUrl
                 }) => {
                     const cvType = cvUrl? cvUrl.slice(cvUrl.lastIndexOf('.')):null;
+                    const cvName = cvUrl? cvUrl.slice(12): 'No CV uploaded';
                     // Format jobs array
                     jobs = jobs.map(({ id:jobId, title, location, company: { id:companyId, name: companyName } }) => {
                         return { jobId, title, location, companyId, companyName };
                     });
                     // Format containing applicant
-                    return { applicantId, firstName, lastName, phone, email, cvType, createdAt, jobs };
+                    return { applicantId, firstName, lastName, phone, email, cvType, cvName, createdAt, jobs };
                 });
                 
-                res.status(200).json({ applicants });
+                res.status(200).json({ applicants: applicants.rows, total: applicants.count });
             }
         }).catch(err => console.log(err));
 
-}
+};
 
 exports.getCv = (req, res, next) => {
     Applicant.findOne({ where: { id: req.params.applicantId } })
@@ -67,9 +118,17 @@ exports.getCv = (req, res, next) => {
 
                 const cvReadStream = fs.createReadStream(cvPath);
                 res.header('Content-Disposition', `attachment; filename=${cvName}`);
-                res.status(200);
-                cvReadStream.pipe(res);
 
+                cvReadStream.on('open', () => {
+                    res.status(200);
+                    cvReadStream.pipe(res);
+                })
+                
+                cvReadStream.on('error', (err) => {
+                    err.statusCode = 404;
+                    err.message = 'File not found';
+                    next(err);
+                })
             } else {
                 const error = new Error('No such applicant');
                 error.statusCode = 404;
@@ -82,3 +141,4 @@ exports.getCv = (req, res, next) => {
 
    
 };
+
