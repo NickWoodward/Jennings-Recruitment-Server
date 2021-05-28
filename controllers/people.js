@@ -115,6 +115,9 @@ exports.deleteUserByEmail = (req, res, next) => {
 
 exports.getUsers = (req, res, next) => {
 
+    const index = req.query.index || 0;
+    const limit = req.query.limit || 10;
+
     User.findAll({ 
         attributes: [ 
             'id', 

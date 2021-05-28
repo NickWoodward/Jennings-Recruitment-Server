@@ -34,7 +34,6 @@ const conversations = require('./controllers/conversations');
 
 const app = express();
 
-
 const store = new MySQLStore({
     host: process.env.DB_HOST,
     port: process.env.DB_PORT,

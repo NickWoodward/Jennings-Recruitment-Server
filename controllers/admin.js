@@ -10,7 +10,9 @@ const Company = require('../models/company');
 
 
 exports.editApplicant = (req, res, next) =>{
-    console.log(req.params);
+    // console.log(req.params)
+    console.log(req.body.firstName);
+    
     Applicant.findByPk(req.params.id, {
         include: Person
     }).then(applicant => {
@@ -20,6 +22,13 @@ exports.editApplicant = (req, res, next) =>{
                 error.statusCode = 404;
                 next(error);
             }
+            console.log(req.file);
+            if(req.file) applicant.cvUrl = req.file.filename;
+            
+            return applicant.save();
+
+            // return res.save();
+        }).then(applicant => {
             const person = applicant.person;
 
             if(!person) {
@@ -32,15 +41,8 @@ exports.editApplicant = (req, res, next) =>{
             person.lastName = req.body.lastName;
             person.phone = req.body.phone;
             person.email = req.body.email;
-            console.log(req.cv);
-            console.log(req.body);
-            // console.log(req);
-            if(req.cv) {
-                // check the cv is the same as the stored one
-            }            
-
-
-            // return res.save();
+                    
+            return person.save();
         }).then(result => {
             res.status(200).json({ result });
         })
