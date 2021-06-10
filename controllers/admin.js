@@ -233,8 +233,8 @@ exports.getJobs = (req, res, next) => {
 };
 
 // @TODO: add validation
+// @TODO: Check that other control methods follow this format for error handling
 exports.editJob = (req, res, next) => {
-    console.log(req.body);
     const errors = validationResult(req);
 
     if(!errors.isEmpty()) {
@@ -251,9 +251,11 @@ exports.editJob = (req, res, next) => {
     })
     .then(job => {
         if(!job) {
-            return res.status(404).json({ message: 'Job not found' });
+            const error = new Error('Job not found');
+            error.statusCode = 422;
+            throw error;
         }
-
+        console.log(req.body);
         job.title = req.body.title;
         job.wage = req.body.wage;
         job.location = req.body.location;
@@ -264,33 +266,38 @@ exports.editJob = (req, res, next) => {
     }).then(job => {
         const company = job.company;
         company.name = req.body.companyName;
-        console.log(company.name);
         return company.save();
     })
     .then(company => {
         res.status(200).json({ message: 'Job edited' });
     })
-    .catch(err => console.log(err));
+    .catch(err => next(err));
 };
 
 // @TODO: add validation
 exports.createJob = (req, res, next) => {
-    const errors = validationResults(req);
+    const errors = validationResult(req);
     if(!errors.isEmpty()) {
         const error = new Error('Validation Error');
         error.statusCode = '422';
         throw error;
     }
-
+    console.log(req.body);
     Job.create({
+        companyId: req.body.companyId,
         title: req.body.title,
         wage: req.body.wage,
         location: req.body.location,
         description: req.body.description,
-        feature: req.body.featured
+        featured: req.body.featured
     }).then(job => {
-
-    }).catch(err => console.log(err));
+        if(!job) {
+            const error = new Error('Could not create the job');
+            error.statusCode = '422';
+            throw error;
+        }
+        res.status(200).json({ message: 'Job created', job });
+    }).catch(err => next(err));
 };
 
 exports.getCompanies = (req, res, next) => {
@@ -299,7 +306,8 @@ exports.getCompanies = (req, res, next) => {
             'id', 
             'name',
             [Sequelize.fn('date_format', Sequelize.col('company.createdAt' ), '%d/%m/%y'), 'createdAt']
-        ]
+        ],
+        group: ['name']
     }).then(companies => {
         res.status(200).json({ message: 'Success', companies });
     }).catch(err => {

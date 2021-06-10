@@ -16,7 +16,7 @@ router.post('/edit/applicant/:id', uploadFile('cv'), adminController.editApplica
 // @TODO: add validation
 router.post('/edit/job/:id', multer().none(), adminController.editJob);
 // @TODO: add validation
-router.post('/new/job', multer().none(), adminController.createJob);
+router.post('/create/job', multer().none(), adminController.createJob);
 
 router.delete('/delete/applicant/:id', adminController.deleteApplicant);
 
