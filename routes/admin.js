@@ -8,8 +8,9 @@ const adminController = require('../controllers/admin');
 
 router.get('/applicants', adminController.getApplicants);
 router.get('/cvs/:applicantId', adminController.getCv);
-router.get('/jobs', adminController.getJobs);
+router.get('/jobs',adminController.getJobs);
 router.get('/companies', adminController.getCompanies);
+
 
 // @TODO: validation
 router.post('/edit/applicant/:id', uploadFile('cv'), adminController.editApplicant);
@@ -19,5 +20,8 @@ router.post('/edit/job/:id', multer().none(), adminController.editJob);
 router.post('/create/job', multer().none(), adminController.createJob);
 
 router.delete('/delete/applicant/:id', adminController.deleteApplicant);
+router.delete('/delete/job/:id', adminController.deleteJob);
+
+
 
 module.exports = router;

@@ -1,4 +1,5 @@
 const fs = require('fs');
+const util = require('util');
 const path = require('path');
 const Sequelize = require('sequelize');
 const { validationResult } = require('express-validator');
@@ -8,6 +9,9 @@ const Applicant = require('../models/applicant');
 const Person = require('../models/person');
 const Job = require('../models/job');
 const Company = require('../models/company');
+
+// View magic methods 
+// console.log(Object.keys(obj.__proto__));
 
 exports.deleteApplicant = (req, res, next) => {
     Applicant.findOne({
@@ -163,6 +167,11 @@ exports.getCv = (req, res, next) => {
 };
 
 exports.getJobs = (req, res, next) => {
+    const index = req.query.index || 0;
+    const limit = req.query.limit || 10;
+    const orderField = req.query.orderField || 'createdAt';
+    const order = req.query.orderDirection || 'DESC';
+    console.log(req.query);
     Job.findAndCountAll({
         attributes: [
             'id',
@@ -171,9 +180,13 @@ exports.getJobs = (req, res, next) => {
             'location',
             'description',
             'featured',
-            [Sequelize.fn('date_format', Sequelize.col('job.createdAt' ), '%d/%m/%y'), 'createdAt'],
+            'createdAt',
+            [Sequelize.fn('date_format', Sequelize.col('job.createdAt'), '%d/%m/%y'), 'jobDate'],
             'companyId'
         ],
+        offset: parseInt(index),
+        limit: parseInt(limit, 10),
+        order: [ [orderField, order] ],
         distinct: true,
         include: [ 
             {
@@ -186,7 +199,7 @@ exports.getJobs = (req, res, next) => {
                     'id', 
                     'cvUrl', 
                     'personId',
-                    [Sequelize.fn('date_format', Sequelize.col('applicants.createdAt' ), '%d/%m/%y'), 'createdAt'],
+                    [Sequelize.fn('date_format', Sequelize.col('applicants.createdAt'), '%d/%m/%y'), 'createdAt'],
                 ],
                 include: [ 
                     {
@@ -197,11 +210,13 @@ exports.getJobs = (req, res, next) => {
             }
         ]
     })
-    .then(jobs => {
-        jobs.rows = jobs.rows.map(({
-            id, title, wage, location, description, featured, createdAt: jobDate, companyId,
-            company: { name: companyName, address: companyAddress },
-            applicants,
+    .then(results => {
+        results.rows = results.rows.map(({
+            dataValues: {
+                id, title, wage, location, description, featured, jobDate, companyId,
+                company: { name: companyName, address: companyAddress },
+                applicants,
+            }
         }) => {
             applicants = applicants.map(({ id, cvUrl, createdAt: appliedDate, personId, person: { firstName, lastName, phone, email } }) => {
                 const cvType = cvUrl? cvUrl.slice(cvUrl.lastIndexOf('.')):null;
@@ -224,8 +239,8 @@ exports.getJobs = (req, res, next) => {
                 applicants
              };
         });
-
-        res.status(200).json({ msg: 'Success', jobs: jobs.rows, total: jobs.count });
+console.log(results.rows);
+        res.status(200).json({ msg: 'Success', jobs: results.rows, total: results.count });
     })
     .catch(err => {
         throw err;
@@ -261,12 +276,9 @@ exports.editJob = (req, res, next) => {
         job.location = req.body.location;
         job.description = req.body.description;
         job.featured = req.body.featured;
-        
+        job.companyId = req.body.companyId;
+
         return job.save();
-    }).then(job => {
-        const company = job.company;
-        company.name = req.body.companyName;
-        return company.save();
     })
     .then(company => {
         res.status(200).json({ message: 'Job edited' });
@@ -298,6 +310,21 @@ exports.createJob = (req, res, next) => {
         }
         res.status(200).json({ message: 'Job created', job });
     }).catch(err => next(err));
+};
+
+exports.deleteJob = (req, res, next) => {
+    Job.findByPk(req.params.id)
+        .then(job => {
+            if(!job) {
+                const error = new Error('No job found');
+                error.statusCode = '422';
+                throw error;
+            }
+
+            return job.destroy();
+        }).then(result => {
+            res.status(200).json({message: 'Job deleted'});
+        }).catch(err => next(err));
 };
 
 exports.getCompanies = (req, res, next) => {

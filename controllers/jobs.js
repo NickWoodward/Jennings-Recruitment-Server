@@ -171,7 +171,6 @@ exports.getJobs = (req, res, next) => {
 };
 
 exports.getMenuData = (req, res, next) => {
-    console.log('called');
     Job.findAll({
         attributes: ['title', 'location'],
         group: ['title', 'location']
