@@ -35,6 +35,7 @@ exports.deleteApplicant = (req, res, next) => {
 
 exports.editApplicant = (req, res, next) =>{
     
+
     Applicant.findOne({
         where: { personId: req.params.id },
         include: Person
@@ -45,7 +46,6 @@ exports.editApplicant = (req, res, next) =>{
                 error.statusCode = 404;
                 next(error);
             }
-            console.log(req.file);
             if(req.file) applicant.cvUrl = req.file.filename;
             
             return applicant.save();
@@ -171,7 +171,6 @@ exports.getJobs = (req, res, next) => {
     const limit = req.query.limit || 10;
     const orderField = req.query.orderField || 'createdAt';
     const order = req.query.orderDirection || 'DESC';
-    console.log(req.query);
     Job.findAndCountAll({
         attributes: [
             'id',
@@ -239,7 +238,6 @@ exports.getJobs = (req, res, next) => {
                 applicants
              };
         });
-console.log(results.rows);
         res.status(200).json({ msg: 'Success', jobs: results.rows, total: results.count });
     })
     .catch(err => {
@@ -270,7 +268,6 @@ exports.editJob = (req, res, next) => {
             error.statusCode = 422;
             throw error;
         }
-        console.log(req.body);
         job.title = req.body.title;
         job.wage = req.body.wage;
         job.location = req.body.location;
@@ -294,7 +291,6 @@ exports.createJob = (req, res, next) => {
         error.statusCode = '422';
         throw error;
     }
-    console.log(req.body);
     Job.create({
         companyId: req.body.companyId,
         title: req.body.title,
