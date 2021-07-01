@@ -48,7 +48,7 @@ app.use(bodyParser.urlencoded({ extended: false }));
 app.use(session({secret: process.env.SESSION_SECRET, resave: false, saveUninitialized: false, store: store, cookie: {secure: process.env.NODE_ENV === 'production'? true: false} }));
 
 app.use((req, res, next) => {
-    res.setHeader('Access-Control-Allow-Origin', 'http://localhost:8082');
+    res.setHeader('Access-Control-Allow-Origin', 'http://localhost:8081');
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE');
     res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Authorization, Accept');

@@ -13,6 +13,9 @@ router.get('/companies', adminController.getCompanies);
 
 
 // @TODO: validation
+router.post('/create/applicant/', uploadFile('cv'), adminController.createApplicant);
+
+// @TODO: validation
 router.post('/edit/applicant/:id', uploadFile('cv'), adminController.editApplicant);
 // @TODO: add validation
 router.post('/edit/job/:id', multer().none(), adminController.editJob);

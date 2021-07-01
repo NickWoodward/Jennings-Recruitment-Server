@@ -13,9 +13,61 @@ const Company = require('../models/company');
 // View magic methods 
 // console.log(Object.keys(obj.__proto__));
 
+//@TODO: validation
+exports.createApplicant = (req, res, next) => {
+    // const errors = validationResult(req);
+    // console.log(errors);
+    // if(!errors.isEmpty()) {
+    //     console.log(errors);
+    //     const error = new Error('Validation Error');
+    //     error.statusCode = 422;
+    //     throw error;
+    // }
+    const { firstName, lastName, phone, email } = req.body;
+    const cvUrl = req.file? req.file.filename: null;
+    let persistPerson;
+
+    Person.create({
+       firstName,
+       lastName,
+       phone,
+       email
+    }).then(person => {
+        if(!person) {
+            const error = new Error('New applicant could not be created');
+            error.statusCode = 422;
+            throw error;
+        }
+        persistPerson = person;
+        return Applicant.create({ cvUrl, personId: person.dataValues.id });
+    }).then(applicant => {
+        if(!applicant) {
+            const error = new Error('New applicant could not be created');
+            error.statusCode = 422;
+            throw error;
+        }
+        const { firstName, lastName, email, phone } = persistPerson;
+        const { id: applicantId } = applicant;
+        const cvName = cvUrl || null;
+        const cvType = cvName? cvName.slice(cvName.lastIndexOf('.')):null;
+
+        const person = {
+            applicantId,
+            firstName,
+            lastName,
+            email,
+            phone,
+            cvName,
+            cvType,
+        }
+
+        res.status(201).json({ msg: "Success", user: person });
+    }).catch(err => next(err));
+};
+
 exports.deleteApplicant = (req, res, next) => {
     Applicant.findOne({
-        where: { personId: req.params.id },
+        where: { id: req.params.id },
         include: Person
     }).then(applicant => {
         if(!applicant) {
@@ -34,10 +86,10 @@ exports.deleteApplicant = (req, res, next) => {
 };
 
 exports.editApplicant = (req, res, next) =>{
-    
+    console.log(`Request: ${req.params.id}`);
 
     Applicant.findOne({
-        where: { personId: req.params.id },
+        where: { id: req.params.id },
         include: Person
     }).then(applicant => {
             if(!applicant) { 
@@ -46,6 +98,7 @@ exports.editApplicant = (req, res, next) =>{
                 error.statusCode = 404;
                 next(error);
             }
+            console.log(`Applicant found, applicantId: ${applicant.id}, personId: ${applicant.personId}`);
             if(req.file) applicant.cvUrl = req.file.filename;
             
             return applicant.save();
@@ -62,7 +115,14 @@ exports.editApplicant = (req, res, next) =>{
             person.firstName = req.body.firstName;
             person.lastName = req.body.lastName;
             person.phone = req.body.phone;
-            person.email = req.body.email;
+
+            console.log(`Person: AppId:${applicant.id}, PersonId: ${person.id}`);
+
+            // Check if email has changed (unique field, so only changes can be saved)
+            // if(person.email !== req.body.email) {
+            //     person.email = req.body.email;
+            // }
+            
                     
             return person.save();
         }).then(result => {
@@ -288,7 +348,7 @@ exports.createJob = (req, res, next) => {
     const errors = validationResult(req);
     if(!errors.isEmpty()) {
         const error = new Error('Validation Error');
-        error.statusCode = '422';
+        error.statusCode = 422;
         throw error;
     }
     Job.create({
@@ -301,7 +361,7 @@ exports.createJob = (req, res, next) => {
     }).then(job => {
         if(!job) {
             const error = new Error('Could not create the job');
-            error.statusCode = '422';
+            error.statusCode = 422;
             throw error;
         }
         res.status(200).json({ message: 'Job created', job });
@@ -313,7 +373,7 @@ exports.deleteJob = (req, res, next) => {
         .then(job => {
             if(!job) {
                 const error = new Error('No job found');
-                error.statusCode = '422';
+                error.statusCode = 422;
                 throw error;
             }
 
