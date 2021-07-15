@@ -4,8 +4,10 @@ const path = require('path');
 const Sequelize = require('sequelize');
 const { validationResult } = require('express-validator');
 
+const Address = require('../models/address');
 const Application = require('../models/application');
 const Applicant = require('../models/applicant');
+const Contact = require('../models/contacts');
 const Person = require('../models/person');
 const Job = require('../models/job');
 const Company = require('../models/company');
@@ -117,12 +119,6 @@ exports.editApplicant = (req, res, next) =>{
             person.phone = req.body.phone;
 
             console.log(`Person: AppId:${applicant.id}, PersonId: ${person.id}`);
-
-            // Check if email has changed (unique field, so only changes can be saved)
-            // if(person.email !== req.body.email) {
-            //     person.email = req.body.email;
-            // }
-            
                     
             return person.save();
         }).then(result => {
@@ -141,14 +137,18 @@ exports.getApplicants = (req, res, next) => {
 
     const index = req.query.index || 0;
     const limit = req.query.limit || 10;
+    const orderField = req.query.orderField || 'createdAt';
+    const order = req.query.orderDirection || 'DESC';
 
     Applicant.findAndCountAll({
         limit: parseInt(limit, 10),
         offset: parseInt(index),
+        order: [[orderField, order]],
         attributes: [
             'id',
             'cvUrl',
-            [Sequelize.fn('date_format', Sequelize.col('applicant.createdAt' ), '%d/%m/%y'), 'createdAt']
+            'createdAt',
+            [Sequelize.fn('date_format', Sequelize.col('applicant.createdAt' ), '%d/%m/%y'), 'userDate']
         ],
         include: [
             {
@@ -171,11 +171,13 @@ exports.getApplicants = (req, res, next) => {
         .then(applicants => {
             if(applicants) {
                 applicants.rows = applicants.rows.map(({ 
-                    id:applicantId, 
-                    createdAt, 
-                    jobs,
-                    person: { firstName, lastName, phone, email },
-                    cvUrl
+                    dataValues: {    
+                        id:applicantId, 
+                        userDate, 
+                        jobs,
+                        person: { firstName, lastName, phone, email },
+                        cvUrl
+                    }
                 }) => {
                     const cvType = cvUrl? cvUrl.slice(cvUrl.lastIndexOf('.')):null;
                     const cvName = cvUrl? cvUrl.slice(12): 'No CV uploaded';
@@ -184,9 +186,11 @@ exports.getApplicants = (req, res, next) => {
                         return { jobId, title, location, companyId, companyName };
                     });
                     // Format containing applicant
-                    return { applicantId, firstName, lastName, phone, email, cvType, cvName, createdAt, jobs };
+                    return { applicantId, firstName, lastName, phone, email, cvType, cvName, userDate, jobs };
                 });
                 
+                console.log('Applicants: ' + applicants.count);
+
                 res.status(200).json({ applicants: applicants.rows, total: applicants.count });
             }
         }).catch(err => console.log(err));
@@ -231,6 +235,7 @@ exports.getJobs = (req, res, next) => {
     const limit = req.query.limit || 10;
     const orderField = req.query.orderField || 'createdAt';
     const order = req.query.orderDirection || 'DESC';
+
     Job.findAndCountAll({
         attributes: [
             'id',
@@ -250,7 +255,7 @@ exports.getJobs = (req, res, next) => {
         include: [ 
             {
                 model: Company,
-                attributes: ['name', 'address']
+                attributes: ['name']
             }, 
             {
                 model: Applicant,
@@ -273,7 +278,7 @@ exports.getJobs = (req, res, next) => {
         results.rows = results.rows.map(({
             dataValues: {
                 id, title, wage, location, description, featured, jobDate, companyId,
-                company: { name: companyName, address: companyAddress },
+                company: { name: companyName },
                 applicants,
             }
         }) => {
@@ -294,10 +299,11 @@ exports.getJobs = (req, res, next) => {
                 jobDate,
                 companyId, 
                 companyName, 
-                companyAddress,
                 applicants
              };
         });
+        console.log('jobs: ' + results.count);
+
         res.status(200).json({ msg: 'Success', jobs: results.rows, total: results.count });
     })
     .catch(err => {
@@ -384,17 +390,133 @@ exports.deleteJob = (req, res, next) => {
 };
 
 exports.getCompanies = (req, res, next) => {
-    Company.findAll({
+    const index = req.query.index || 0;
+    const orderField = req.query.orderField || 'createdAt';
+    const order = req.query.orderDirection || 'DESC';
+
+    const constraints = {
+        offset: parseInt(index),
+        order: [[ orderField, order ]]
+    };
+
+    if(req.query.limit) constraints.limit = parseInt(req.query.limit);
+
+    Company.findAndCountAll({
         attributes: [ 
             'id', 
             'name',
-            [Sequelize.fn('date_format', Sequelize.col('company.createdAt' ), '%d/%m/%y'), 'createdAt']
+            'createdAt',
+            [Sequelize.fn('date_format', Sequelize.col('company.createdAt' ), '%d/%m/%y'), 'companyDate'],
         ],
-        group: ['name']
-    }).then(companies => {
-        res.status(200).json({ message: 'Success', companies });
+        // group: ['name'],
+        ...constraints,
+        include: [
+            {
+                model: Job
+            }, 
+            {
+                model: Address
+            },
+            {
+                model: Person
+            }
+        ]
+            
+    }).then(results => {
+        results.rows = results.rows.map(({ 
+                dataValues: { 
+                    id, 
+                    name, 
+                    companyDate, 
+                    addresses, 
+                    people,
+                } 
+        }) => { 
+
+            people = people.map(({ firstName, lastName, id: personId, email, phone, contact: { position, id: contactId } }) =>  { 
+                return { personId, firstName, lastName, email, phone, position, contactId };
+            });
+            return { id, name, companyDate, addresses, people }; 
+        });
+
+        res.status(200).json({ companies: results.rows, total: results.count });
     }).catch(err => {
         throw err;
     });
 };
 
+exports.createCompany = (req, res, next) => {
+    const errors = validationResult(req);
+    
+    if(!errors.isEmpty()) {
+        const error = new Error('Validation Error');
+        error.statusCode = 422;
+        throw error;
+    }
+
+    let persistCompany;
+    let persistPerson;
+    let persistAddress;
+
+    Company.create({
+        name: req.body.companyName
+    }).then(company => {
+        persistCompany = company;
+
+        return Person.create({
+            firstName: req.body.firstName,
+            lastName: req.body.lastName,
+            phone: req.body.phone,
+            email: req.body.email
+        });
+    }).then(person => {
+        persistPerson = person;
+
+        return Address.create({
+            firstLine: req.body.firstLine,
+            secondLine: req.body.secondLine,
+            city: req.body.city,
+            county: req.body.county,
+            postcode: req.body.postcode
+        });
+    }).then(address => {
+        persistAddress = address;
+
+        return persistCompany.addPeople(persistPerson, { through: { position: req.body.position } });
+    }).then(result => {
+        return persistCompany.addAddresses(persistAddress);
+    }).then(result => {
+        res.status(201).json({ msg: 'Success', company: persistCompany });
+    }).catch(err => next(err));
+
+
+    // Company.create({
+    //     name: req.body.companyName,
+    //     people: [ 
+    //         {
+    //             firstName: req.body.firstName,
+    //             lastName: req.body.lastName,
+    //             phone: req.body.phone,
+    //             email: req.body.email,
+    //             contact: {
+    //                 position: req.body.position
+    //             }
+    //         }
+    //     ],
+    //     // address: [
+    //     //     {
+    //     //         firstLine: req.body.firstLine,
+    //     //         secondLine: req.body.secondLine,
+    //     //         city: req.body.city,
+    //     //         county: req.body.county,
+    //     //         postcode: req.body.postcode,
+    //     //         companyAddress: { }
+    //     //     }
+    //     // ]
+    // }, {
+    //     include: Person
+    // }).then(result => {
+    //     console.log(result);
+    //     res.status(200).json({ msg: 'Success', result });
+    // }).catch(err => next(err));
+};

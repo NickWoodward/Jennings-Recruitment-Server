@@ -98,7 +98,9 @@ app.use((error, req, res, next) => {
     Person.belongsToMany(Company, { through: Contact });
     Company.belongsToMany(Person, { through: Contact });
 
+
 // sequelize.sync({force: true})
+// alter: true looks at changes in columns
 sequelize.sync()
     .then(async result => {
         const server = app.listen(8080);

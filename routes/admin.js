@@ -22,6 +22,9 @@ router.post('/edit/job/:id', multer().none(), adminController.editJob);
 // @TODO: add validation
 router.post('/create/job', multer().none(), adminController.createJob);
 
+// @TODO: add validation
+router.post('/create/company', multer().none(), adminController.createCompany);
+
 router.delete('/delete/applicant/:id', adminController.deleteApplicant);
 router.delete('/delete/job/:id', adminController.deleteJob);
 
