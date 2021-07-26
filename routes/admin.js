@@ -27,6 +27,7 @@ router.post('/create/company', multer().none(), adminController.createCompany);
 
 router.delete('/delete/applicant/:id', adminController.deleteApplicant);
 router.delete('/delete/job/:id', adminController.deleteJob);
+router.delete('/delete/company/:id', adminController.deleteCompany);
 
 
 

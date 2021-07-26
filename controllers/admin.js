@@ -385,6 +385,12 @@ exports.deleteJob = (req, res, next) => {
 
             return job.destroy();
         }).then(result => {
+            if(!result) {
+                const error = new Error('Error deleting job');
+                error.statusCode = 500;
+                throw error;
+            }
+            
             res.status(200).json({message: 'Job deleted'});
         }).catch(err => next(err));
 };
@@ -410,6 +416,7 @@ exports.getCompanies = (req, res, next) => {
         ],
         // group: ['name'],
         ...constraints,
+        distinct: true,
         include: [
             {
                 model: Job
@@ -519,4 +526,87 @@ exports.createCompany = (req, res, next) => {
     //     console.log(result);
     //     res.status(200).json({ msg: 'Success', result });
     // }).catch(err => next(err));
+};
+
+exports.deleteCompany = (req, res, next) => {
+        let company;
+
+        Company.findByPk(req.params.id)
+                .then(result => {
+                    if(!result) {
+                        const error = new Error('Cannot find Company');
+                        error.statusCode = 404;
+                        throw error;
+                    }
+                    company = result;
+                    return company.getPeople();
+
+                })
+                .then(people => {
+                    if(!people) {
+                        const error = new Error('Error deleting contacts');
+                        error.statusCode = 500;
+                        throw error;
+                    }
+                    console.log(`People: ${people}, ${!people}`);
+                    const ids = people.map(person => person.dataValues.id);
+
+                    // If people is an empty array, just return it, else destroy the records
+                    if(people.length === 0) return people;
+                    else return Person.destroy({ where: { id: ids } });
+
+                }).then(result => {
+                    if(!result) {
+                        const error = new Error('Error deleting contacts');
+                        error.statusCode = 500;
+                        throw error;
+                    }
+                    return company.getJobs();
+                }).then(jobs => {
+                    if(!jobs) {
+                        const error = new Error('Error deleting jobs');
+                        error.statusCode = 500;
+                        throw error;
+                    }
+                    console.log(`Jobs: ${jobs}`);
+                    const ids = jobs.map(job => job.dataValues.id);
+
+                    if(jobs.length === 0) return jobs;
+                    // NB: Destroying the job destroys the applications
+                    else return Job.destroy({ where: { id: ids } });
+                    
+                }).then(result => {
+                    if(!result) {
+                        const error = new Error('Error deleting jobs');
+                        error.statusCode = 500;
+                        throw error;
+                    }
+                    return company.getAddresses();
+                }).then(addresses => {
+                    if(!addresses) {
+                        const error = new Error('Error deleting addresses');
+                        error.statusCode = 500;
+                        throw error;
+                    }
+                    const ids = addresses.map(address => address.dataValues.id);
+
+                    if(addresses.length === 0) return addresses;
+                    else return Address.destroy({ where: { id: ids } });
+
+                }).then(result => {
+                    if(!result) {
+                        const error = new Error('Error deleting addresses');
+                        error.statusCode = 500;
+                        throw error;
+                    }
+                    return company.destroy();
+
+                }).then(result => {
+                    if(!result) {
+                        const error = new Error('Error deleting job');
+                        error.statusCode = 500;
+                        throw error;
+                    }
+                    res.status(200).json({msg: 'Company Deleted'});
+                }).catch(err => next(err));
 };

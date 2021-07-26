@@ -17,6 +17,7 @@ const Contact = require('./models/contacts');
 const Applicant = require('./models/applicant');
 const Application = require('./models/application');
 const Address = require('./models/address');
+const CompanyAddress = require('./models/companyAddress');
 
 // ROUTES
 const jobRoutes = require('./routes/jobs');
@@ -79,12 +80,14 @@ app.use((error, req, res, next) => {
 
 // SET UP ASSOCIATIONS
     // Companies 1:M Jobs, Job has mandatory fk
-    Company.hasMany(Job, { foreignKey: { name: 'companyId', allowNull: false } });
-    Job.belongsTo(Company, { foreignKey: { name: 'companyId', allowNull: false } });
+    Company.hasMany(Job, { foreignKey: { name: 'companyId', allowNull: false, unique: true } });
+    Job.belongsTo(Company, { foreignKey: { name: 'companyId', allowNull: false, unique: true } });
 
     // Address M:N Companies
-    Company.belongsToMany(Address, { through: 'CompanyAddress' });
-    Address.belongsToMany(Company, { through: 'CompanyAddress' });
+    Company.belongsToMany(Address, { through: CompanyAddress });
+    Address.belongsToMany(Company, { through: CompanyAddress });
+    // Company.belongsToMany(Address, { through: 'CompanyAddress' });
+    // Address.belongsToMany(Company, { through: 'CompanyAddress' });
 
     // Applicant is a subtype of Person
     Person.hasOne(Applicant, { foreignKey: { name: 'personId', allowNull: false, unique: true } });
