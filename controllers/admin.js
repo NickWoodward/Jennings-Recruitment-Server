@@ -230,13 +230,15 @@ exports.getCv = (req, res, next) => {
    
 };
 
+
+
 exports.getJobs = (req, res, next) => {
     const index = req.query.index || 0;
     const limit = req.query.limit || 10;
     const orderField = req.query.orderField || 'createdAt';
     const order = req.query.orderDirection || 'DESC';
 
-    Job.findAndCountAll({
+    const findJobs = Job.findAndCountAll({
         attributes: [
             'id',
             'title',
@@ -305,10 +307,16 @@ exports.getJobs = (req, res, next) => {
         console.log('jobs: ' + results.count);
 
         res.status(200).json({ msg: 'Success', jobs: results.rows, total: results.count });
+        return;
     })
     .catch(err => {
-        throw err;
+        if(!err.statusCode) err.statusCode = 500;
+        next(err);
+        return err;
     });
+
+    return findJobs;
+
 };
 
 // @TODO: add validation
@@ -357,7 +365,8 @@ exports.createJob = (req, res, next) => {
         error.statusCode = 422;
         throw error;
     }
-    Job.create({
+
+    const job = Job.create({
         companyId: req.body.companyId,
         title: req.body.title,
         wage: req.body.wage,
@@ -370,8 +379,15 @@ exports.createJob = (req, res, next) => {
             error.statusCode = 422;
             throw error;
         }
-        res.status(200).json({ message: 'Job created', job });
-    }).catch(err => next(err));
+        res.status(201).json({ message: 'Job created', job: job });
+        return;
+    }).catch(err => {
+        if(!err.statusCode) err.statusCode = 500;
+        next(err);
+        return err;
+    });
+
+    return job;
 };
 
 exports.deleteJob = (req, res, next) => {
