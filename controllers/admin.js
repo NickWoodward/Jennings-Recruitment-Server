@@ -362,6 +362,7 @@ exports.createJob = (req, res, next) => {
     const errors = validationResult(req);
     if(!errors.isEmpty()) {
         const error = new Error('Validation Error');
+        error.validationErrors = errors.errors;
         error.statusCode = 422;
         throw error;
     }

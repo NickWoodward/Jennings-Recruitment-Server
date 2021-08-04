@@ -29,6 +29,14 @@ const Job = sequelize.define('job', {
     featured: {
         type: Sequelize.BOOLEAN,
         allowNull: false
+    },
+    createdAt: {
+        type: Sequelize.DATE(3),
+        allowNull: false,
+    },
+    updatedAt: {
+        type: Sequelize.DATE(3),
+        allowNull: false,
     }
 });
 
