@@ -22,9 +22,18 @@ const CompanyAddress = require('../models/companyAddress');
 
 
 faker.locale = "en_GB";
+let connection;
 
 describe('Admin Controller - Jobs', async () => {
-    await createDatabaseAssociations();
+    before(async() => {
+        await createDatabaseAssociations();
+    });
+
+    beforeEach(async() => {
+        connection = await sequelize.sync({force: true});
+        await populateDB();
+    });
+
 
     it('Should throw a 500 error if accessing the DB fails', async () => {
         sinon.stub(Job, 'findAndCountAll');
@@ -42,77 +51,101 @@ describe('Admin Controller - Jobs', async () => {
         Job.findAndCountAll.restore();
     });
 
-    // it('should return an array and count of jobs', async() => {
-    //     sequelize.sync({force: true})
-    //         .then(async result => {
-    //             await populateDB();
+    it('should return an array and count of jobs', async() => {
+        const req = { query:{} };
+        const res = {
+            statusCode: 500,
+            jobs: [],
+            total: 0,
+            msg: '',
+            status: function(code) {
+                this.statusCode = code;
+                return this;
+            }, 
+            json: function (data) {
+                this.msg = data.msg;
+                this.jobs = data.jobs;
+                this.total = data.total;
+            }
+        };
+        const jobs = await adminController.getJobs(req, res, () => {});
+        expect(res.statusCode).to.be.equal(200);
+        expect(res.msg).to.be.equal('Success');
+        expect(res.jobs.length).to.be.equal(res.total);
+    });
 
-    //             const req = { query:{} };
-    //             const res = {
-    //                 statusCode: 500,
-    //                 jobs: [],
-    //                 total: 0,
-    //                 msg: '',
-    //                 status: function(code) {
-    //                     this.statusCode = code;
-    //                     return this;
-    //                 }, 
-    //                 json: function (data) {
-    //                     this.msg = data.msg;
-    //                     this.jobs = data.jobs;
-    //                     this.total = data.total;
-    //                 }
-    //             };
-    //             const jobs = await adminController.getJobs(req, res, () => {});
-    //             expect(res.statusCode).to.be.equal(200);
-    //             expect(res.msg).to.be.equal('Success');
-    //             expect(res.jobs.length).to.be.equal(res.total);
-    //         }).catch(err => console.log(err));
-    // });
+    it('should create a job in the database / return the job', async() => {
+            const { companyId, title, wage, location, description, featured } = await createJob({});
 
-    it('should return the created job', async() => {
-        sequelize.sync({force: true})
-            .then(async result => {
-                await populateDB();
+            const req = { body:{ companyId, title, wage, location, description, featured } };
+            const res = {
+                statusCode: 500,
+                job: {},    
+                message: '',
+                status: function(code) {
+                    this.statusCode = code;
+                    return this;
+                }, 
+                json: function (data) {
+                    this.message = data.message;
+                    this.job = data.job;
+                }
+            };
+            await adminController.createJob(req, res, () => {});
 
-                // Create the dummy job data
-                const companyId = await faker.datatype.number({ 'min': 1, 'max': 4 });
-                const title = await faker.name.jobTitle();
-                const wage = await faker.random.arrayElement([ 40000, 50000, 60000, 70000, 80000, 90000 ]);
-                const location = await faker.address.city();
-                const description = await faker.name.jobDescriptor();
-                const featured = await faker.datatype.number({ 'min': 0, 'max': 1 });
+            const databaseEntry = await Job.findByPk(res.job.dataValues.id);
 
-                const req = { body:{ companyId, title, wage, location, description, featured } };
-                const res = {
-                    statusCode: 500,
-                    job: {},    
-                    message: '',
-                    status: function(code) {
-                        this.statusCode = code;
-                        return this;
-                    }, 
-                    json: function (data) {
-                        this.message = data.message;
-                        this.job = data.job;
-                    }
-                };
-                await adminController.createJob(req, res, () => {});
+            const returnedJob = { 
+                ...req.body,
+                id: res.job.dataValues.id, 
+                featured: featured? true : false, 
+                createdAt: res.job.dataValues.createdAt,
+                updatedAt: res.job.dataValues.updatedAt 
+            };
 
-                const databaseEntry = await Job.findByPk(res.job.dataValues.id);
+            expect(res.statusCode).to.be.equal(201);
+            expect(res.message).to.be.equal('Job created');
+            expect(res.job.dataValues).to.be.eql(returnedJob);
+            expect(res.job.dataValues).to.be.eql(databaseEntry.dataValues);
+    });
 
-                const returnedJob = { 
-                    ...req.body,
-                    id: res.job.dataValues.id, 
-                    featured: featured? true : false, 
-                    createdAt: res.job.dataValues.createdAt,
-                    updatedAt: res.job.dataValues.updatedAt 
-                };
+    it('should throw a 422 error if validation fails', async() => {
+        const { companyId, title, wage, location, description, featured } = await createJob({ title: 'a' });
 
-                expect(res.statusCode).to.be.equal(201);
-                expect(res.message).to.be.equal('Job created');
-                expect(res.job.dataValues).to.be.eql(returnedJob);
-                expect(res.job.dataValues).to.be.eql(databaseEntry.dataValues);
-            }).catch(err => console.log(err));
+        console.log(title);
+        const req = { body:{ companyId, title, wage, location, description, featured } };
+        const res = {
+            statusCode: 500,
+            message: '',
+            job: {},
+            status: function(code) {
+                this.statusCode = code;
+                return this;
+            },
+            json: function(data) {
+                this.message = data.message;
+                this.job = data.job;
+            }
+        };
+
+        await adminController.createJob(req, res, () => {});
+
+        expect(res.statusCode).to.be.equal(422);
+    });
+
+    after(async() => {
+        await connection.close();
     });
 });
+
+const createJob = async ({companyId, title, wage, location, description, featured}) => {
+    // Create the dummy job data
+    companyId = companyId? companyId : await faker.datatype.number({ 'min': 1, 'max': 4 });
+    title = title? title : await faker.name.jobTitle();
+    wage = wage? wage : await faker.random.arrayElement([ 40000, 50000, 60000, 70000, 80000, 90000 ]);
+    location = location? location : await faker.address.city();
+    description = description? description : await faker.name.jobDescriptor();
+    featured = featured? featured : await faker.datatype.number({ 'min': 0, 'max': 1 });
+
+    return { companyId, title, wage, location, description, featured }
+};
