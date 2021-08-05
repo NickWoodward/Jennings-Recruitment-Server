@@ -359,6 +359,7 @@ exports.editJob = (req, res, next) => {
 // @TODO: add validation
 exports.createJob = (req, res, next) => {
     const errors = validationResult(req);
+
     if(!errors.isEmpty()) {
         const error = new Error('Validation Error');
         error.validationErrors = errors.errors;
@@ -368,7 +369,6 @@ exports.createJob = (req, res, next) => {
 
     // Check to see if a related company exists
     const job = Company.findByPk(req.body.companyId).then(result => {
-        // Company.count().then(total => console.log(total));
         if(!result) {
             const error = new Error('No such Company exists');
             error.statusCode = 404;
@@ -385,6 +385,7 @@ exports.createJob = (req, res, next) => {
     }).then(job => {
         if(!job) {
             const error = new Error('Could not create the job');
+   
             error.statusCode = 422;
             throw error;
         }

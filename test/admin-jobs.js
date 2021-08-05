@@ -10,6 +10,7 @@ const faker = require('faker');
 
 const app = require('../app');
 const sequelize = require('../util/database');
+const { Op } = require("sequelize");
 
 const adminController = require('../controllers/admin');
 const { createDatabaseAssociations, populateDB } = require('./utils');
@@ -27,6 +28,7 @@ const CompanyAddress = require('../models/companyAddress');
 
 faker.locale = "en_GB";
 let connection;
+const numOfTestJobs = 4;
 
 describe('Admin Controller - Jobs', async () => {
     before(async() => {
@@ -58,6 +60,8 @@ describe('Admin Controller - Jobs', async () => {
         Job.findAndCountAll.restore();
     });
 
+
+    // GETTING JOB/JOBS
     it('should return an array and count of jobs', async() => {
         const req = { query:{} };
         const res = {
@@ -81,39 +85,65 @@ describe('Admin Controller - Jobs', async () => {
         expect(res.jobs.length).to.be.equal(res.total);
     });
 
+    it('should return the job with the given id', async() => {
+        const randomId = Math.ceil(Math.random() * 4);
+
+        const req = { params: { id: randomId } };
+        const res = {
+            statusCode: 500,
+            message: '',
+            job: {},
+            status: function(code) {
+                this.statusCode = code;
+                return this;
+            },
+            json: function(data) {
+                this.message = data.message,
+                this.job = data.job
+            } 
+        };
+
+        await adminController.getJob(req, res, () => {});
+
+        expect(res.statusCode).to.be.equal(200);
+        expect(res.job.id).to.be.equal(randomId);
+    });
+
+
+    // CREATING JOB
     it('should create a job in the database / return the job', async() => {
-            const { companyId, title, wage, location, description, featured } = await createJob({});
+        const { companyId, title, wage, location, description, featured } = await createJob({});
 
-            const req = { body:{ companyId, title, wage, location, description, featured } };
-            const res = {
-                statusCode: 500,
-                job: {},    
-                message: '',
-                status: function(code) {
-                    this.statusCode = code;
-                    return this;
-                }, 
-                json: function (data) {
-                    this.message = data.message;
-                    this.job = data.job;
-                }
-            };
-            await adminController.createJob(req, res, () => {});
+        const req = { body:{ companyId, title, wage, location, description, featured } };
+        const res = {
+            statusCode: 500,
+            job: {},    
+            message: '',
+            status: function(code) {
+                this.statusCode = code;
+                return this;
+            }, 
+            json: function (data) {
+                this.message = data.message;
+                this.job = data.job;
+            }
+        };
+        await adminController.createJob(req, res, () => {});
 
-            const databaseEntry = await Job.findByPk(res.job.dataValues.id);
+        const databaseEntry = await Job.findByPk(res.job.dataValues.id);
 
-            const returnedJob = { 
-                ...req.body,
-                id: res.job.dataValues.id, 
-                featured: featured? true : false, 
-                createdAt: res.job.dataValues.createdAt,
-                updatedAt: res.job.dataValues.updatedAt 
-            };
+        const returnedJob = { 
+            ...req.body,
+            id: res.job.dataValues.id, 
+            featured: featured? true : false, 
+            createdAt: res.job.dataValues.createdAt,
+            updatedAt: res.job.dataValues.updatedAt 
+        };
 
-            expect(res.statusCode).to.be.equal(201);
-            expect(res.message).to.be.equal('Job created');
-            expect(res.job.dataValues).to.be.eql(returnedJob);
-            expect(res.job.dataValues).to.be.eql(databaseEntry.dataValues);
+        expect(res.statusCode).to.be.equal(201);
+        expect(res.message).to.be.equal('Job created');
+        expect(res.job.dataValues).to.be.eql(returnedJob);
+        expect(res.job.dataValues).to.be.eql(databaseEntry.dataValues);
     });
 
     it('should throw a 422 error if validation fails', async() => {
@@ -136,21 +166,18 @@ describe('Admin Controller - Jobs', async () => {
 
     it('should throw a 404 if the company the job is created for is not found', async() => {
         // There are 4 companies in the dummy data
-        const job = await createJob({companyId: 5});
+        const randomId = Math.ceil(Math.random() * 10) + 4;
 
-        return chai
-            .request(app)
-            .post('/admin/create/job')
-            .type('form')
-            .send(job)
-            .then(res => {
-                expect(res.status).to.be.equal(404);
-                expect(res.json.message).to.include('No such Company exits');
-            })
-            .catch(err => {throw err} );
+        const job = await createJob({ companyId: randomId });
 
+        const req = { body: { ...job } };
+
+        const error = await adminController.createJob(req, {}, () => {});
+        expect(error).to.be.an('error');
+        expect(error).to.have.property('statusCode', 404);
     });
 
+    // DELETING JOBS
     it('should return 200 if job deleted', async() => {
         // There are 4 test jobs in the db
         const randomId = Math.ceil(Math.random() * 4);
@@ -173,9 +200,20 @@ describe('Admin Controller - Jobs', async () => {
         expect(res.statusCode).to.be.equal(200);
     });
 
+    it('should return 422 if the job cannot be found', async() => {
+        const randomId = Math.ceil(Math.random() * 5) + numOfTestJobs;
+
+        const req = { params: { id: randomId } };
+        const res = {};
+
+        const error = await adminController.deleteJob(req, res, () => {});
+
+        expect(error).to.be.an('error');
+        expect(error).to.have.property('statusCode', 422);
+    });
+
     it('should remove the job from the db if deleted', async() => {
-        // There are 4 test jobs in the db
-        const randomId = Math.ceil(Math.random() * 4);
+        const randomId = Math.ceil(Math.random() * numOfTestJobs);
 
         const req = { params: { id: randomId } };
         const res = { 
@@ -201,6 +239,53 @@ describe('Admin Controller - Jobs', async () => {
         expect(result).to.have.property('statusCode', 404);
     });
 
+    it('should delete the applications for the given job', async() => {
+        const randomId = Math.ceil(Math.random() * numOfTestJobs);
+
+        const req = { params: { id: randomId } };
+        const res = {};
+
+        await adminController.deleteJob(req, res, () => {});
+
+        const applicants = await Application.findAll({ where: { jobId: randomId } });
+
+        expect(applicants).to.be.an('array').that.is.empty;
+    });
+
+    it('should not delete applicants that are related to a job', async() => {
+        const randomId = Math.ceil(Math.random() * numOfTestJobs);
+
+        const req = { params: { id: randomId } };
+        const res = {
+            statusCode: '500',
+            message: '',
+            status: function(code) {
+                this.statusCode = code;
+                return this;
+            },
+            json: function(data) {
+                this.message = data.message;
+            }
+        };
+
+        const job = await Job.findByPk(randomId);
+        let applicants = await job.getApplicants();
+        
+        applicants = applicants.map(applicant => applicant.dataValues.personId);
+        await adminController.deleteJob(req, res, () => {});
+
+        expect(res.statusCode).to.be.equal(200);
+
+        let results = await Applicant.findAll({ 
+            where: { 
+                id: {
+                    [Op.or]: applicants
+                }
+            } 
+        });
+        results = results.map(applicant => applicant.dataValues.id);
+        expect(results).to.be.an('array').that.is.not.empty;
+    })
 
     after(async() => {
         await connection.close();
