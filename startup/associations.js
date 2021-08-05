@@ -1,3 +1,5 @@
+//@TODO: Combine this with the non testing database file
+
 const Job = require('../models/job');
 const Person = require('../models/person');
 const Company = require('../models/company');
@@ -20,8 +22,8 @@ exports.createDBConnection = () => {
 
 exports.createDatabaseAssociations = () => {
     // Companies 1:M Jobs
-    Company.hasMany(Job, { foreignKey: { name: 'companyId', allowNull: false, unique: true } });
-    Job.belongsTo(Company, { foreignKey: { name: 'companyId', allowNull: false, unique: true } });
+    Company.hasMany(Job, { foreignKey: { name: 'companyId', allowNull: false } });
+    Job.belongsTo(Company, { foreignKey: { name: 'companyId', allowNull: false } });
 
     // Address M:N Companies
     Company.belongsToMany(Address, { through: CompanyAddress });

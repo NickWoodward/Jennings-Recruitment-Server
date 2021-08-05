@@ -1,5 +1,6 @@
 const app = require('./app');
 const sequelize = require('./util/database');
+const { populateDB } = require('./startup/associations');
 
 // COMMUNICATION APIs
 const twilio = require('./util/twilio');

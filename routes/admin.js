@@ -35,8 +35,8 @@ router.post('/create/job', multer().none(),
             .escape()
             .isFloat()
             .withMessage('Enter a number')
-            .isLength({ min: 5, max: 20 })
-        .withMessage('Wage must be over 5 digits'),
+            .isLength({ min: 5, max: 8 })
+            .withMessage('Wage must be over 5 digits'),
         body('location')
             .trim()
             .escape()
@@ -46,7 +46,11 @@ router.post('/create/job', multer().none(),
             .trim()
             .escape()
             .isLength({ min: 5, max: 500 })
-            .withMessage('Enter a description between 5 and 500 characters')
+            .withMessage('Enter a description between 5 and 500 characters'),
+        body('featured')
+       
+        .isFloat({ gt: -1, lt: 2 })
+        .withMessage('Enter either a 0 or 1')
     ],
 adminController.createJob);
 

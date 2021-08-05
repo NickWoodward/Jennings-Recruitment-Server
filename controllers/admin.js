@@ -304,7 +304,6 @@ exports.getJobs = (req, res, next) => {
                 applicants
              };
         });
-        console.log('jobs: ' + results.count);
 
         res.status(200).json({ msg: 'Success', jobs: results.rows, total: results.count });
         return;
@@ -367,13 +366,22 @@ exports.createJob = (req, res, next) => {
         throw error;
     }
 
-    const job = Job.create({
-        companyId: req.body.companyId,
-        title: req.body.title,
-        wage: req.body.wage,
-        location: req.body.location,
-        description: req.body.description,
-        featured: req.body.featured
+    // Check to see if a related company exists
+    const job = Company.findByPk(req.body.companyId).then(result => {
+        // Company.count().then(total => console.log(total));
+        if(!result) {
+            const error = new Error('No such Company exists');
+            error.statusCode = 404;
+            throw error;
+        }
+        return Job.create({
+            companyId: req.body.companyId,
+            title: req.body.title,
+            wage: req.body.wage,
+            location: req.body.location,
+            description: req.body.description,
+            featured: req.body.featured
+        })
     }).then(job => {
         if(!job) {
             const error = new Error('Could not create the job');
@@ -391,8 +399,27 @@ exports.createJob = (req, res, next) => {
     return job;
 };
 
+exports.getJob = (req, res, next) => {
+    return Job
+        .findByPk(req.params.id)
+        .then(job => {
+            if(!job) {
+                const error = new Error('No job found');
+                error.statusCode = 404;
+                throw error;
+            }
+            res.status(200).json({ message: 'Job found', job });
+            return;
+        })
+        .catch(err => {
+            if(!err.statusCode) err.statusCode = 500;
+            next(err);
+            return err;
+        });
+};
+
 exports.deleteJob = (req, res, next) => {
-    Job.findByPk(req.params.id)
+    return Job.findByPk(req.params.id)
         .then(job => {
             if(!job) {
                 const error = new Error('No job found');
@@ -407,9 +434,13 @@ exports.deleteJob = (req, res, next) => {
                 error.statusCode = 500;
                 throw error;
             }
-            
             res.status(200).json({message: 'Job deleted'});
-        }).catch(err => next(err));
+            return;
+        }).catch(err => {
+            if(!err.statusCode) err.statusCode = 500;
+            next(err);
+            return err;
+        });
 };
 
 exports.getCompanies = (req, res, next) => {
