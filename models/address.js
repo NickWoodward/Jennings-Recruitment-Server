@@ -11,7 +11,6 @@ const Address = sequelize.define('address', {
     firstLine: {
         type: Sequelize.STRING,
         allowNull: false,
-        unique: true
     },
     secondLine: {
         type: Sequelize.STRING

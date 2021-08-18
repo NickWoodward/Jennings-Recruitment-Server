@@ -49,10 +49,10 @@ exports.populateDB = async() => {
     const address3 = await Address.create({ firstLine: '306 stonehill drive', secondLine: 'haversely', city: 'salisbury', county: 'wiltshire', postcode: 'sn12 5ek' });
     const address4 = await Address.create({ firstLine: '306 city road', secondLine: '', city: 'london', county: 'greater london', postcode: 'ec1v 2nx' });
 
-    company1.addAddress(address1);
-    company1.addAddress(address4);
-    company2.addAddress(address2);
-    company2.addAddress(address3);
+    await company1.addAddress(address1);
+    await company2.addAddress(address4);
+    await company3.addAddress(address2);
+    await company4.addAddress(address3);
 
     // // Applicants
     const person1 = await Person.create({ firstName: 'nick', lastName: 'woodward', phone: '074843732635', email: 'nickwoodward@gmail.com' });
@@ -76,17 +76,17 @@ exports.populateDB = async() => {
     // Contacts
     const person4 = await Person.create({ firstName: 'jj', lastName: 'wode', phone: '074843732635', email: 'j@gmail.com' });
     const person5 = await Person.create({ firstName: 'steff', lastName: 'reed', phone: '074843732635', email: 'steff@gmail.com' });
-    person4.addCompany(company1, { through: { position: 'ceo' } });
-    person5.addCompany(company1, { through: { position: 'head of hr' } });
+    await person4.addCompany(company1, { through: { position: 'ceo' } });
+    await person5.addCompany(company1, { through: { position: 'head of hr' } });
 
     const person6 = await Person.create({ firstName: 'dom', lastName: 'rumbo', phone: '074843732635', email: 'rumbo@gmail.com' });
-    person6.addCompany(company2, { through: { position: 'boss' } });
+    await person6.addCompany(company2, { through: { position: 'boss' } });
 
     const person7 = await Person.create({ firstName: 'ruth', lastName: 'symonds', phone: '0736463748', email: 'ruth@gmail.com' });
-    person7.addCompany(company3, { through: { position: 'head of gin' } });
+    await person7.addCompany(company3, { through: { position: 'head of gin' } });
 
     const person8 = await Person.create({ firstName: 'alex', lastName: 'may', phone: '0736463748', email: 'maylord@gmail.com' });
     const person9 = await Person.create({ firstName: 'john', lastName: 'gantlett', phone: '0736463748', email: 'ganty@gmail.com' });
-    person8.addCompany(company4, { through: { position: 'nazmodan' } });
-    person9.addCompany(company4, { through: { position: 'jester' } });
+    await person8.addCompany(company4, { through: { position: 'nazmodan' } });
+    await person9.addCompany(company4, { through: { position: 'jester' } });
 }

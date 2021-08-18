@@ -318,7 +318,6 @@ exports.getJobs = (req, res, next) => {
 
 };
 
-// @TODO: add validation
 // @TODO: Check that other control methods follow this format for error handling
 exports.editJob = (req, res, next) => {
     const errors = validationResult(req);
@@ -327,11 +326,9 @@ exports.editJob = (req, res, next) => {
         const error = new Error();
         error.message = 'Validation Error';
         error.statusCode = 422;
-
         throw (error);
     }
-
-    Job.findOne({
+    return Job.findOne({
         where: { id: req.params.id },
         include: Company 
     })
@@ -350,13 +347,23 @@ exports.editJob = (req, res, next) => {
 
         return job.save();
     })
-    .then(company => {
-        res.status(200).json({ message: 'Job edited' });
+    .then(job => {
+        if(!job) {
+            const error = new Error('Error editing the job');
+            error.statusCode = 422;
+            throw error;
+        }
+
+        res.status(200).json({ message: 'Job edited', job: job });
+        return;
     })
-    .catch(err => next(err));
+    .catch(err => {
+        if(!err.statusCode) err.statusCode = 500;
+        next(err);
+        return err;
+    });
 };
 
-// @TODO: add validation
 exports.createJob = (req, res, next) => {
     const errors = validationResult(req);
 
@@ -401,8 +408,7 @@ exports.createJob = (req, res, next) => {
 };
 
 exports.getJob = (req, res, next) => {
-    return Job
-        .findByPk(req.params.id)
+    return Job.findByPk(req.params.id)
         .then(job => {
             if(!job) {
                 const error = new Error('No job found');
@@ -456,7 +462,7 @@ exports.getCompanies = (req, res, next) => {
 
     if(req.query.limit) constraints.limit = parseInt(req.query.limit);
 
-    Company.findAndCountAll({
+    return Company.findAndCountAll({
         attributes: [ 
             'id', 
             'name',
@@ -479,33 +485,77 @@ exports.getCompanies = (req, res, next) => {
         ]
             
     }).then(results => {
-        results.rows = results.rows.map(({ 
+        if(!results) {
+            const error = new Error('Cannot get Companies');
+            error.statusCode = 422;
+            throw error;
+        }
+
+        results.rows = results.rows.map((
+            { 
                 dataValues: { 
                     id, 
                     name, 
                     companyDate, 
                     addresses, 
                     people,
-                } 
+                }
         }) => { 
 
             people = people.map(({ firstName, lastName, id: personId, email, phone, contact: { position, id: contactId } }) =>  { 
                 return { personId, firstName, lastName, email, phone, position, contactId };
             });
+        
+            addresses = addresses.map(( { 
+                dataValues: {
+                    id: addressId,
+                    firstLine,
+                    secondLine,
+                    city,
+                    county,
+                    postcode
+                }
+            }  ) => { 
+                return { addressId, firstLine, secondLine, city, county, postcode }
+            });
             return { id, name, companyDate, addresses, people }; 
         });
-
         res.status(200).json({ companies: results.rows, total: results.count });
+        return;
     }).catch(err => {
-        throw err;
+        if(!err.statusCode) err.statusCode = 500;
+        next(err);
+        return err;
+    });
+};
+
+exports.getCompany = (req, res, next) => {
+    return Company.findByPk(req.params.id, {
+        include: Address
+        
+    }).then(company => {
+        if(!company) {
+            const error = new Error('Could not find the company');
+            error.statusCode = 404;
+            throw error;
+        }
+
+        res.status(200).json({ msg: 'Company found', company });
+        return company;
+    })
+    
+    .catch(err => {
+        if(!err.statusCode) err.statusCode = 500;
+        next(err);
+        return err;
     });
 };
 
 exports.createCompany = (req, res, next) => {
     const errors = validationResult(req);
-    
     if(!errors.isEmpty()) {
         const error = new Error('Validation Error');
+        error.validationErrors = errors.errors;
         error.statusCode = 422;
         throw error;
     }
@@ -514,7 +564,7 @@ exports.createCompany = (req, res, next) => {
     let persistPerson;
     let persistAddress;
 
-    Company.create({
+    return Company.create({
         name: req.body.companyName
     }).then(company => {
         persistCompany = company;
@@ -537,13 +587,18 @@ exports.createCompany = (req, res, next) => {
         });
     }).then(address => {
         persistAddress = address;
-
         return persistCompany.addPeople(persistPerson, { through: { position: req.body.position } });
     }).then(result => {
         return persistCompany.addAddresses(persistAddress);
     }).then(result => {
+        console.log(persistCompany);
         res.status(201).json({ msg: 'Success', company: persistCompany });
-    }).catch(err => next(err));
+        return;
+    }).catch(err => {
+        if(!err.statusCode) err.statusCode = 500;
+        next(err);
+        return err;
+    });
 
 
     // Company.create({

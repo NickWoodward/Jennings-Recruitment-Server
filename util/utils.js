@@ -27,3 +27,11 @@ exports.issueAccessToken = (user) => {
         expires: expiresIn
     }
 };
+
+exports.createString = (num) => {
+    let temp = '';
+    for(let x = 0; x < num; x++) {
+        temp += 'a';
+    }
+    return temp;
+} 
