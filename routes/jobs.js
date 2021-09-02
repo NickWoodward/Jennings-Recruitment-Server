@@ -22,6 +22,8 @@ router.get('/featured', jobsController.getFeaturedJobs);
 // GET /jobs/:id
 router.get('/:id', jobsController.getJob);
 
+
+
 // POST /jobs/create
 router.post('/create', [
     body('title')

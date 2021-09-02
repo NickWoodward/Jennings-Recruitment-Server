@@ -1,7 +1,9 @@
 const Sequelize = require('sequelize');
 
 const dbName = process.env.NODE_ENV !== 'testing'?  process.env.DB_DATABASE : process.env.DB_TEST_DATABASE;
-const logging = process.env.NODE_ENV === 'testing'? false:true;
+const logging = process.env.NODE_ENV === 'testing'? true:true;
+
+console.log(dbName);
 
 const sequelize = new Sequelize(dbName, process.env.DB_USER, process.env.DB_PASSWORD, {
     dialect: 'mysql', 

@@ -5,12 +5,6 @@ const express = require('express');
 const session = require('express-session');
 const MySQLStore = require('express-mysql-session')(session);
 
-const { 
-    createDatabaseAssociations, 
-    createDBConnection, 
-    populateDB 
-} = require('./startup/associations');
-
 const app = express();
 
 const store = new MySQLStore({
@@ -40,8 +34,5 @@ app.use((error, req, res, next) => {
 
     res.status(status).json({ message: `Caught in app.js ${message}`, error: validationErrors });
 });
-
-// Set up sequelize table relationships
-createDatabaseAssociations();
 
 module.exports = app;

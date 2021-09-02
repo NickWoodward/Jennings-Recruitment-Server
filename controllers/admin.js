@@ -2,6 +2,7 @@ const fs = require('fs');
 const util = require('util');
 const path = require('path');
 const Sequelize = require('sequelize');
+const sequelize = require('../util/database');
 const { validationResult } = require('express-validator');
 
 const Address = require('../models/address');
@@ -490,7 +491,6 @@ exports.getCompanies = (req, res, next) => {
             error.statusCode = 422;
             throw error;
         }
-
         results.rows = results.rows.map((
             { 
                 dataValues: { 
@@ -536,14 +536,13 @@ exports.getCompany = (req, res, next) => {
     }).then(company => {
         if(!company) {
             const error = new Error('Could not find the company');
-            error.statusCode = 404;
+            error.statusCode = 422;
             throw error;
         }
 
         res.status(200).json({ msg: 'Company found', company });
         return company;
-    })
-    
+    }) 
     .catch(err => {
         if(!err.statusCode) err.statusCode = 500;
         next(err);
@@ -551,100 +550,76 @@ exports.getCompany = (req, res, next) => {
     });
 };
 
-exports.createCompany = (req, res, next) => {
-    const errors = validationResult(req);
-    if(!errors.isEmpty()) {
-        const error = new Error('Validation Error');
-        error.validationErrors = errors.errors;
-        error.statusCode = 422;
-        throw error;
-    }
 
-    let persistCompany;
-    let persistPerson;
-    let persistAddress;
+exports.createCompany = async(req, res, next) => {
 
-    return Company.create({
-        name: req.body.companyName
-    }).then(company => {
-        persistCompany = company;
+    try {
+        const errors = validationResult(req);
+        if(!errors.isEmpty()) {
+            const error = new Error('Validation Error');
+            error.validationErrors = errors.array({ onlyFirstError: true });
+            error.statusCode = 422;
+            throw error;
+        }
 
-        return Person.create({
-            firstName: req.body.firstName,
-            lastName: req.body.lastName,
-            phone: req.body.phone,
-            email: req.body.email
+        // Wrap db functions in transaction callback, passing t to each call option object
+        await sequelize.transaction(async (t) => {
+
+            const company = await Company.create({ name: req.body.companyName }, { transaction: t });
+
+            const person = await Person.create({ 
+                firstName: req.body.firstName,
+                lastName: req.body.lastName,
+                phone: req.body.phone,
+                email: req.body.email
+            }, { transaction: t });
+
+    
+
+            const address = await Address.create({
+                firstLine: req.body.firstLine,
+                secondLine: req.body.secondLine,
+                city: req.body.city,
+                county: req.body.county,
+                postcode: req.body.postcode
+            }, { transaction: t });
+
+            await company.addPeople(person, { through: { position: req.body.position }, transaction: t});
+            await company.addAddresses(address, { transaction: t });
+
+            res.status(201).json({ msg: 'Success', company: company });
+        
+            return;
+    
         });
-    }).then(person => {
-        persistPerson = person;
-
-        return Address.create({
-            firstLine: req.body.firstLine,
-            secondLine: req.body.secondLine,
-            city: req.body.city,
-            county: req.body.county,
-            postcode: req.body.postcode
-        });
-    }).then(address => {
-        persistAddress = address;
-        return persistCompany.addPeople(persistPerson, { through: { position: req.body.position } });
-    }).then(result => {
-        return persistCompany.addAddresses(persistAddress);
-    }).then(result => {
-        console.log(persistCompany);
-        res.status(201).json({ msg: 'Success', company: persistCompany });
-        return;
-    }).catch(err => {
-        if(!err.statusCode) err.statusCode = 500;
+    
+      // Transaction committed successfully
+      // `result` is whatever was returned from the transaction callback
+    } catch (err) {
+        // Transaction rolled back automatically by Sequelize
+        if(!err.statusCode) {
+            err.statusCode = 500;
+        }
         next(err);
         return err;
-    });
-
-
-    // Company.create({
-    //     name: req.body.companyName,
-    //     people: [ 
-    //         {
-    //             firstName: req.body.firstName,
-    //             lastName: req.body.lastName,
-    //             phone: req.body.phone,
-    //             email: req.body.email,
-    //             contact: {
-    //                 position: req.body.position
-    //             }
-    //         }
-    //     ],
-    //     // address: [
-    //     //     {
-    //     //         firstLine: req.body.firstLine,
-    //     //         secondLine: req.body.secondLine,
-    //     //         city: req.body.city,
-    //     //         county: req.body.county,
-    //     //         postcode: req.body.postcode,
-    //     //         companyAddress: { }
-    //     //     }
-    //     // ]
-    // }, {
-    //     include: Person
-    // }).then(result => {
-    //     console.log(result);
-    //     res.status(200).json({ msg: 'Success', result });
-    // }).catch(err => next(err));
+    }
 };
-
+    
 exports.deleteCompany = (req, res, next) => {
-        let company;
-
-        Company.findByPk(req.params.id)
+    let company;
+    
+    return sequelize.transaction(function(t) {
+        return (
+            Company
+                .findByPk(req.params.id, { transaction: t })
                 .then(result => {
                     if(!result) {
                         const error = new Error('Cannot find Company');
-                        error.statusCode = 404;
+                        error.statusCode = 422;
                         throw error;
                     }
                     company = result;
-                    return company.getPeople();
-
+                    return company.getPeople({transaction: t});
                 })
                 .then(people => {
                     if(!people) {
@@ -652,12 +627,11 @@ exports.deleteCompany = (req, res, next) => {
                         error.statusCode = 500;
                         throw error;
                     }
-                    console.log(`People: ${people}, ${!people}`);
                     const ids = people.map(person => person.dataValues.id);
 
                     // If people is an empty array, just return it, else destroy the records
                     if(people.length === 0) return people;
-                    else return Person.destroy({ where: { id: ids } });
+                    else return Person.destroy({ where: { id: ids }, transaction: t });
 
                 }).then(result => {
                     if(!result) {
@@ -665,19 +639,18 @@ exports.deleteCompany = (req, res, next) => {
                         error.statusCode = 500;
                         throw error;
                     }
-                    return company.getJobs();
+                    return company.getJobs({ transaction: t });
                 }).then(jobs => {
                     if(!jobs) {
                         const error = new Error('Error deleting jobs');
                         error.statusCode = 500;
                         throw error;
                     }
-                    console.log(`Jobs: ${jobs}`);
                     const ids = jobs.map(job => job.dataValues.id);
 
                     if(jobs.length === 0) return jobs;
                     // NB: Destroying the job destroys the applications
-                    else return Job.destroy({ where: { id: ids } });
+                    else return Job.destroy({ where: { id: ids }, transaction: t });
                     
                 }).then(result => {
                     if(!result) {
@@ -685,17 +658,18 @@ exports.deleteCompany = (req, res, next) => {
                         error.statusCode = 500;
                         throw error;
                     }
-                    return company.getAddresses();
+                    return company.getAddresses({ transaction: t });
                 }).then(addresses => {
                     if(!addresses) {
                         const error = new Error('Error deleting addresses');
                         error.statusCode = 500;
                         throw error;
                     }
+                    console.log(`Addresses: ${JSON.stringify(addresses)}`);
                     const ids = addresses.map(address => address.dataValues.id);
 
                     if(addresses.length === 0) return addresses;
-                    else return Address.destroy({ where: { id: ids } });
+                    else return Address.destroy({ where: { id: ids }, transaction: t });
 
                 }).then(result => {
                     if(!result) {
@@ -703,14 +677,22 @@ exports.deleteCompany = (req, res, next) => {
                         error.statusCode = 500;
                         throw error;
                     }
-                    return company.destroy();
+                    return company.destroy({transaction: t});
+                })
+        )
+    }).then(result => {
+        if(!result) {
+            const error = new Error('Error deleting job');
+            error.statusCode = 500;
+            throw error;
+        }
+        res.status(200).json({msg: 'Company Deleted'});
+        return;
+    }).catch(err => {
+        if(!err.statusCode) err.statusCode = 500;
+        next(err);
+        return err;
+    });;
 
-                }).then(result => {
-                    if(!result) {
-                        const error = new Error('Error deleting job');
-                        error.statusCode = 500;
-                        throw error;
-                    }
-                    res.status(200).json({msg: 'Company Deleted'});
-                }).catch(err => next(err));
+
 };

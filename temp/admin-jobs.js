@@ -7,7 +7,7 @@ chai.use(chaiHttp);
 const sinon = require('sinon');
 const faker = require('faker');
 
-const app = require('../app');
+// const app = require('../app');
 const sequelize = require('../util/database');
 const { Op } = require("sequelize");
 
@@ -25,17 +25,17 @@ faker.locale = "en_GB";
 let connection;
 const numOfTestJobs = 4;
 
-describe('Admin Controller - Jobs', async () => {
+// describe('Admin Controller - Jobs', async () => {
     // before(async() => {
     //     await createDatabaseAssociations();
     // });
 
-    beforeEach(async() => {
-        try {
-            connection = await sequelize.sync({force: true});
-            await populateDB();
-        } catch(err){console.log(err)}
-    });
+    // beforeEach(async() => {
+    //     try {
+    //         connection = await sequelize.sync({force: true});
+    //         await populateDB();
+    //     } catch(err){console.log(err)}
+    // });
 
 
     // // GETTING JOB/JOBS
@@ -457,14 +457,14 @@ describe('Admin Controller - Jobs', async () => {
     //     expect(result.companyId).to.be.equal(companyId);
     // });
 
-    afterEach(async()=> {
-        sinon.restore();
-    });
+    // afterEach(async()=> {
+    //     sinon.restore();
+    // });
 
     // after(async() => {
     //     await connection.close();
     // });
-});
+// });
 
 const createJob = async ({companyId, title, wage, location, description, featured}) => {
     // Create the dummy job data

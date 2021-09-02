@@ -7,7 +7,7 @@ const Application = require('../models/application');
 const Address = require('../models/address');
 const CompanyAddress = require('../models/companyAddress');
 
-
+//@TODO: Check these foriegn keys are correct in both
 exports.createDatabaseAssociations = () => {
     // Companies 1:M Jobs
     Company.hasMany(Job, { foreignKey: { name: 'companyId', allowNull: false} });
