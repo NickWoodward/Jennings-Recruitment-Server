@@ -23,7 +23,7 @@ const numOfTestCompanyAddresses = 4;
 //@TODO: Replace .sync with .truncate, so associations don't have to be set up each 
 describe('Admin Controller: Companies', function() {
 
-    // GET COMPANIES/COMPANY
+    // GET COMPANIES
     it('should return 200 when called', async() => {
         sinon.stub(Company, 'findAndCountAll');
         Company.findAndCountAll.resolves({
@@ -72,16 +72,6 @@ describe('Admin Controller: Companies', function() {
         expect(res.total).to.be.equal(res.companies.length);
     });
 
-    it('should return 500 when getting a single company if the db connection fails', async() => {
-        sinon.stub(Company, 'findByPk');
-        Company.findByPk.rejects();
-
-        const req = { params: { id: 0 } };
-        const error = await adminController.getCompany(req, {}, () => {});
-
-        expect(error.statusCode).to.be.equal(500);
-    });
-
     it('should return 500 when getting companies if the db connection fails', async() => {
         sinon.stub(Company, 'findAndCountAll');
         Company.findAndCountAll.rejects();
@@ -90,27 +80,7 @@ describe('Admin Controller: Companies', function() {
         const error = await adminController.getCompanies(req, {}, () => {});
 
         expect(error.statusCode).to.be.equal(500);
-    });
-
-    it('should return 422 if the companies cannot be returned', async() => {
-        sinon.stub(Company, 'findAndCountAll');
-        Company.findAndCountAll.resolves();
-
-        const req = { query: {} };
-
-        const error = await adminController.getCompanies(req, {}, () => {});
-
-        expect(error.statusCode).to.be.equal(422);
-        expect(error.message).to.be.equal('Cannot get Companies');
-    });
-
-    it('should return 422 if the company cannot be returned', async() => {
-        const req = { params: { id: numOfTestCompanies + 1 } };
-
-        const error = await adminController.getCompany(req, {}, () => {});
-
-        expect(error.statusCode).to.be.equal(422);
-        expect(error.message).to.be.equal('Could not find the company');
+        expect(error.message).to.be.equal('Error')
     });
 
     it('should return an array and count of companies', async() => {
@@ -144,6 +114,28 @@ describe('Admin Controller: Companies', function() {
         expect(res.companies[randomArrayIndex].addresses[0]).to.include.all.keys('addressId', 'firstLine', 'city', 'county', 'postcode');
     });
 
+
+    // GET COMPANY
+    it('should return 500 when getting a single company if the db connection fails', async() => {
+        sinon.stub(Company, 'findByPk');
+        Company.findByPk.rejects();
+
+        const req = { params: { id: 0 } };
+        const error = await adminController.getCompany(req, {}, () => {});
+
+        expect(error.statusCode).to.be.equal(500);
+        expect(error.message).to.be.equal('Error');
+    });
+
+    it('should return 422 if the company cannot be returned', async() => {
+        const req = { params: { id: numOfTestCompanies + 1 } };
+
+        const error = await adminController.getCompany(req, {}, () => {});
+
+        expect(error.statusCode).to.be.equal(422);
+        expect(error.message).to.be.equal('Could not find the company');
+    });
+
     it('should return the company with the given id', async() => {
         const randomId = Math.ceil(Math.random() * numOfTestCompanies);
         const req = { params: { id: randomId } };
@@ -171,6 +163,16 @@ describe('Admin Controller: Companies', function() {
 
 
     // CREATE COMPANY
+    it('should return 500 if the db connection fails', async function() {
+        sinon.stub(Company, 'create');
+        Company.create.rejects();
+
+        const error = await adminController.createCompany({ body: {companyName: 'test'} },{},()=>{});
+
+        expect(error.statusCode).to.be.equal(500);
+        expect(error.message).to.be.equal('Error');
+    });
+
     it('should return 422 if param validation fails', async() => {
 
         const requester = chai.request(app).keepOpen();
@@ -292,6 +294,7 @@ describe('Admin Controller: Companies', function() {
             expect(responses[1].status).to.be.equal(422);
             expect(responses[1].body.error).to.include.deep.members(expectedLimitErrors);
 
+            //@TODO: Check these validations (deep equal vs etc etc)
             expect(responses[2].status).to.be.equal(422);
             expect(responses[2].body.error).to.be.deep.equal(expectedPhoneError);
 
@@ -328,8 +331,8 @@ describe('Admin Controller: Companies', function() {
             addPeople: function() { },
             addAddresses: function() { }
         });
-        Person.create.resolves();
-        Address.create.resolves();
+        Person.create.resolves({});
+        Address.create.resolves({});
 
         const requester = chai.request(app).keepOpen();
 
@@ -382,8 +385,52 @@ describe('Admin Controller: Companies', function() {
         }).catch(err => { throw err });
     });
 
-    it('should not create the Company if the Person creation fails', async() => {
+    it('should return 500 if a falsey value is returned from Company.create', async function() {
+        sinon.stub(Company, 'create');
+        Company.create.resolves(null);
 
+        const req = { body: { companyName: 'test' } };
+
+        const error = await adminController.createCompany(req,{},()=>{});
+        expect(error.statusCode).to.be.equal(500);
+        expect(error.message).to.be.equal('Error creating Company');
+    });
+
+    it('should return 500 if a falsey value is returned from Person.create', async function() {
+        sinon.stub(Company, 'create');
+        Company.create.resolves({});
+        
+        sinon.stub(Person, 'create');
+        Person.create.resolves();
+
+        const req = { body: { companyName: '', name: '', firstName: '', lastName: '', phone: '', email: '', firstLine: '', secondLine: '', city: '', country: '', postcode: '' } };
+        
+        const error = await adminController.createCompany(req, {}, () => {});
+
+        expect(error).to.be.an('error');
+        expect(error.statusCode).to.be.equal(500);
+        expect(error.message).to.be.equal('Error creating Person');
+    });
+    
+    it('should return 500 if a falsey value is returned from Address.create', async function() {
+        sinon.stub(Company, 'create');
+        Company.create.resolves({});
+        
+        sinon.stub(Person, 'create');
+        Person.create.resolves({});
+
+        sinon.stub(Address, 'create');
+
+        const req = { body: { firstLine: 'test', secondLine: 'test', city: 'test', country: 'test', postcode: 'test' } };
+        
+        const error = await adminController.createCompany(req, {}, () => {});
+
+        expect(error).to.be.an('error');
+        expect(error.statusCode).to.be.equal(500);
+        expect(error.message).to.be.equal('Error creating Address');
+    });
+
+    it('should not create the Company if the Person creation fails', async() => {
         const testCompany =   {
             companyName: 'ConferencePlatform',
             firstName: 'Dominic',
@@ -411,6 +458,7 @@ describe('Admin Controller: Companies', function() {
 
         expect(error).to.be.an('error');
         expect(error.statusCode).to.be.equal(500);
+        expect(error.message).to.be.equal('Error');
         expect(result).to.be.null;
     });
 
@@ -457,7 +505,8 @@ describe('Admin Controller: Companies', function() {
         });
 
         expect(error).to.be.an("error");
-        expect(error.statusCode).to.be.eql(500);
+        expect(error.statusCode).to.be.equal(500);
+        expect(error.message).to.be.equal('Error');
         expect(company).to.be.null;
         expect(person).to.be.null;
         expect(contact).to.be.null;
@@ -515,6 +564,7 @@ describe('Admin Controller: Companies', function() {
 
         expect(result).to.be.an('error');
         expect(result.statusCode).to.be.equal(500);
+        expect(result.message).to.be.equal('Error');
 
         expect(address).to.be.null;
         expect(contact).to.be.null;
@@ -572,6 +622,7 @@ describe('Admin Controller: Companies', function() {
 
         expect(result).to.be.an('error');
         expect(result.statusCode).to.be.equal(500);
+        expect(result.message).to.be.equal('Error');
 
         expect(address).to.be.null;
         expect(contact).to.be.null;
@@ -598,15 +649,24 @@ describe('Admin Controller: Companies', function() {
             }
         };
 
-        console.log(randomId);
         await adminController.deleteCompany(req, res, () => {});
        
-
         expect(res.statusCode).to.be.equal(200);
         expect(res.msg).to.be.equal('Company Deleted');
     });
 
-    it('should return 422 when a company is not found', async function() {
+    it('should return 500 if the db connection fails', async function() {
+        sinon.stub(Company, 'findByPk');
+        Company.findByPk.rejects();
+
+        const req = { params: { id: 1 } };
+
+        const error = await adminController.deleteCompany(req, {}, () => {});
+        expect(error.statusCode).to.be.equal(500);
+        expect(error.message).to.be.equal('Error');
+    });
+
+    it('should return 422 when a company is not found or a falsey value is returned', async function() {
         const id = numOfTestCompanies +1;
 
         const req = { params: { id: id} };
@@ -616,20 +676,39 @@ describe('Admin Controller: Companies', function() {
         expect(error.message).to.be.equal('Cannot find Company');
     });
 
+    // Initially prevent deletion if there isn't a Person to delete (potentially picks up logic errors elsewhere)
     it('should return 500 and rollback if a contact for that company is not found', async function() {
+        const id = 1;
         sinon.stub(Company.prototype, 'getPeople');
-        Company.prototype.getPeople.resolves();
+        Company.prototype.getPeople.resolves([]);
 
-        const error = await adminController.deleteCompany({ params: {id:1} }, {}, () => {});
+        const error = await adminController.deleteCompany({ params: {id: id} }, {}, () => {});
 
         const company = await Company.findByPk(1);
 
         expect(error).to.be.an('error');
-        expect(error.message).to.be.equal('Error deleting contacts');
+        expect(error.message).to.be.equal('Error deleting contacts. Please contact admininstrator');
         expect(error.statusCode).to.be.equal(500);
         expect(company).to.exist;
-        expect(company.dataValues).to.have.property('id', 1);
+        expect(company.dataValues).to.have.property('id', id);
     });
+
+    // it.only('should return 500 and rollback if it cant retrieve the contacts', async function() {
+    //     const id = 1;
+    //     sinon.stub(Company, 'findByPk');
+    //     Company.findByPk.resolves({
+    //         getPeople: function() { return new Promise((resolve, reject) => {}) }
+    //     });
+
+    //     sinon.stub(Company.prototype, 'getPeople');
+    //     Company.prototype.getPeople.rejects();
+
+    //     const error = await adminController.deleteCompany({ params: { id } }, {}, () => {});
+
+    //     expect(error).to.be.an('error');
+    //     expect(error.statusCode).to.be.equal(500);
+    //     expect(error.message).to.be.equal('Error');
+    // });
 
     it('should return 500 and rollback if there is an error deleting related Contacts', async function() {
         const randomId = Math.ceil(Math.random() * numOfTestCompanies);
@@ -716,5 +795,306 @@ describe('Admin Controller: Companies', function() {
     });
 
 
+
+
+
+
+
+
+
+
+    // EDIT COMPANY
+    it.only('should return 422 if edit validation fails', async function() {
+
+        // Validation rules are tested in the creation of a company
+        const company = {
+            companyName: '',
+            firstName: 'a',
+            lastName: 'a',
+            position: 'a',
+            phone: 'a',
+            email: 'a',
+            firstLine: '',
+            secondLine:  'a',
+            city: 'a',
+            county: 'a',
+            postcode: 'a'
+        };
+
+        return chai
+                .request(app)
+                .post(`/admin/edit/company/1/2/3`)
+                .send(company)
+                .then(response => {
+                    const expectedErrors = [
+                        { param: 'companyName', msg: 'Enter a company name between 1 and 50 characters' },
+                        { param: 'firstName', msg: 'Enter a first name between 2 and 50 characters' },
+                        { param: 'lastName', msg: 'Enter a last name between 2 and 50 characters' },
+                        { param: 'phone', msg: 'Must be between 9 and 12 characters' },
+                        { param: 'email', msg: 'Please enter an email between 4 and 50 characters' },
+                        { param: 'position', msg: 'Enter a last name between 2 and 50 characters' },
+                        { param: 'firstLine', msg: 'Please enter a value between 1 and 50 characters' },
+                        { param: 'secondLine', msg: 'Please enter a value between 2 and 50 characters' },
+                        { param: 'city', msg: 'Please enter a value between 3 and 60 characters' },
+                        { param: 'county', msg: 'Please enter a county between 2 and 50 characters' },
+                        { param: 'postcode', msg: 'Please enter a postcode between 5 and 8 characters' }
+                    ];
+
+                    expect(response.statusCode).to.be.equal(422);
+                    expect(response.body.error).to.include.deep.members(expectedErrors);
+                });
+    });
+
+    it.only('should return 500 if the db connection fails', async function() {
+        sinon.stub(Company, 'findByPk');
+        Company.findByPk.rejects();
+
+        const error = await adminController.editCompany({ params: { id: 1, contactId: 1, addressId: 1 } }, {}, () => {});
+
+        expect(error).to.be.an('error');
+        expect(error.statusCode).to.be.equal(500);
+        expect(error.message).to.be.equal('Error')
+    });
+
+    it.only('should return 400 if Contact and Address params are not present', async function() {
+        sinon.stub(Company, 'findByPk');
+        Company.findByPk.resolves({
+            addresses: [ { addressId: 1 } ],
+            people: [ { personId: 1 } ]
+        });
+
+        const errorContact = await adminController.editCompany({ params: { id: 1, addressId: 1 } }, {}, () => {});
+        const errorAddress = await adminController.editCompany({ params: { id: 1, contactId: 1 } }, {}, () => {});
+
+        expect(errorContact).to.be.an('error');
+        expect(errorContact.statusCode).to.be.equal(400);
+        expect(errorContact.message).to.be.equal('Error editing Company');
+
+        expect(errorAddress).to.be.an('error');
+        expect(errorAddress.statusCode).to.be.equal(400);
+        expect(errorAddress.message).to.be.equal('Error editing Company');
+    });
+
+    it.only('should return 422 if the Company cannot be found', async function() {
+        const id = numOfTestCompanies +1;
+
+        const error = await adminController.editCompany({ params: { id: id, contactId: 1, addressId: 1 } }, {}, () => {});
+
+        expect(error).to.be.an('error');
+        expect(error.statusCode).to.be.equal(422);
+    });
+
+    it.only('should return 422 if the contactId param is not valid', async function() {
+        sinon.stub(Company, 'findByPk');
+        Company.findByPk.resolves({
+            addresses: [ { id: 1 } ],
+            people: [ { id: 1 }, { id: 2 } ]
+        });
+
+        const invalidContactId = 100;
+
+        const req = { params: { id: 1, addressId: 1, contactId: invalidContactId } };
+
+        const error = await adminController.editCompany(req, {}, () => {});
+
+        expect(error).to.be.an('error');
+        expect(error.statusCode).to.be.equal(422);
+        expect(error.message).to.be.equal('Error editing Company');
+    });
+
+    it.only('should return 422 if the addressId param is not valid', async function() {
+        sinon.stub(Company, 'findByPk');
+        Company.findByPk.resolves({
+            addresses: [ { id: 1 }, { id: 2 } ],
+            people: [ { id: 1 }, { id: 2 } ]
+        });
+
+        const invalidAddressId = 100;
+
+        const req = { params: { id: 1, addressId: invalidAddressId, contactId: 1 } };
+
+        const error = await adminController.editCompany(req, {}, () => {});
+
+        expect(error).to.be.an('error');
+        expect(error.statusCode).to.be.equal(422);
+        expect(error.message).to.be.equal('Error editing Company');
+    });
+
+    it.only('should return 500 if no related Contact is found', async function() {
+        const randomId = Math.ceil(Math.random() * numOfTestCompanies);
+
+        sinon.stub(Company, 'findByPk');
+        Company.findByPk.resolves({
+            addresses: [ { addressId: 1 } ],
+            people: []
+        });
+
+        const errorPeople = await adminController.editCompany({ params: { id: randomId, contactId: 100, addressId: 100 } }, {}, () => {});
+
+        expect(errorPeople).to.be.an('error');
+        expect(errorPeople.message).to.be.equal('Error editing Company');
+        expect(errorPeople.statusCode).to.be.equal(500);
+    });
+
+    it.only('should return 500 if no related Address is found', async function() {
+        const randomId = Math.ceil(Math.random() * numOfTestCompanies);
+
+        sinon.stub(Company, 'findByPk');
+        Company.findByPk.resolves({
+            addresses: [],
+            people: [ { id: 1 } ]
+        });
+
+        const errorAddresses = await adminController.editCompany({ params: { id: randomId, contactId: 1, addressId: 100 } }, {}, () => {});
+
+        expect(errorAddresses).to.be.an('error');
+        expect(errorAddresses.message).to.be.equal('Error editing Company');
+        expect(errorAddresses.statusCode).to.be.equal(500);
+    });
+
+    it.only('should return 200 if update successful', async function() {
+        sinon.stub(Company, 'findByPk');
+        Company.findByPk.resolves({
+            addresses: [ { id: 1, save: () => { return } } ],
+            people: [ { id: 1,  contact: { position: '' }, save: () => { return } } ],
+            save: function() { return }
+        });
+
+        const testCompany = {
+            companyName: 'test',
+            firstName: 'test',
+            lastName: 'test',
+            position: 'test',
+            phone: '0777777777',
+            email: 'dr@gamil.com',
+            firstLine: 'test',
+            secondLine: 'test',
+            city: 'test',
+            county: 'test',
+            postcode: 'RG1 1PR'
+        };
+
+        const req = {
+            params: { id: 1, addressId: 1, contactId: 1 },
+            body: { ...testCompany }
+        };
+        const res = {
+            statusCode: 0,
+            msg: '',
+            company: {},
+            status: function(code) {
+                this.statusCode = code;
+                return this;
+            },
+            json: function(data) {
+                this.msg = data.msg;
+                this.company = data.company;
+            }
+        }
+
+        const error = await adminController.editCompany(req, res, () => {});
+        expect(error).to.be.undefined;
+        expect(res.statusCode).to.be.equal(200);
+        expect(res.msg).to.be.equal('Company successfully updated');
+    });
+
+    it.only('should correctly update the Company', async function() {
+        const randomId = Math.ceil(Math.random() * numOfTestCompanies);
+
+        const company = await Company.findByPk(randomId, { include: [ { model: Person }, { model: Address } ] });
+        
+        // Take the ids of the last entry in each array
+        const contactId = company.people[company.people.length -1].id;
+        const addressId = company.addresses[company.addresses.length -1].id;
+
+        const editedCompany = {
+            companyName: 'test',
+            firstName: 'test',
+            lastName: 'test',
+            position: 'test',
+            phone: '0777777777',
+            email: 'dr@gamil.com',
+            firstLine: 'test',
+            secondLine: 'test',
+            city: 'test',
+            county: 'test',
+            postcode: 'RG1 1PR'
+        };
+
+        const req = {
+            params: { id: randomId, contactId, addressId },
+            body: { ...editedCompany }
+        };
+        const res = {
+            statusCode: 0,
+            msg: '',
+            company: {},
+            status: function(code) {
+                this.statusCode = code;
+                return this;
+            },
+            json: function(data) {
+                this.company = data.company;
+                this.msg = data.msg;
+            }
+        };
+
+        const error = await adminController.editCompany(req, res, () => {});
+
+        // Destructure the sequelize model returned in the response
+        const {
+            id,
+            name,
+            addresses,
+            people
+        } = res.company;
+ 
+        // Extract the address from each of the sequelize models
+        const mappedAddresses = addresses.map(address => {
+            const { id, companyaddress, createdAt, updatedAt, ...values } = address.dataValues;
+            return values;
+        });
+
+        const mappedPeople = people.map(person => {
+            const { id, createdAt, updatedAt, contact, ...values } = person.dataValues;
+            return { position: contact.position, ...values }
+        });
+
+        // Extract the address and the contact from the test company
+        const { companyName, firstName, lastName, position, phone, email, ...address  } = editedCompany;
+        const { companyName: coName, firstLine, secondLine, city, county, postcode, ...person } = editedCompany;
+
+        expect(error).to.be.undefined;
+        expect(res.statusCode).to.be.equal(200);
+        expect(id).to.be.equal(randomId);
+        expect(name).to.be.equal(editedCompany.companyName);
+        expect(mappedAddresses).to.deep.include(address);
+        expect(mappedPeople).to.deep.include(person);
+    });
+
+    // *** CHECK EMAIL UNIQUE
+
+
+    //**************** @TODO: Go through code in controller and check where sequelize could return null, and where checks are necessary */
+    it('test returns', async function() {
+        // Returns the empty array
+        // const result = await Contact.findAll({ where: { companyId: 10 } });
+        // console.log(result);
+
+        // // Returns null
+        // const company = await Company.findByPk(10);
+        // console.log(company);
+
+        // // Returns the created object
+        // const createReturn = await Address.create({ firstLine: 'test', secondLine: 'test', city: 'test', county: 'test', postcode: 'sn105kd'});
+        
+       // No person exists
+       const testCo = await Company.create({ name: 'test' });
+       const person = await Person.create({ firstName: 'nick', lastName: 'test', email: 'test@te3st.com', phone: '07352635263' });
+       await person.addCompany(testCo, { through: { position: 'test' } })
+    //    console.log(testCo);
+       const people = await testCo.getPeople();
+       console.log(people);
+    });
 });
 

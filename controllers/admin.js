@@ -463,6 +463,7 @@ exports.getCompanies = (req, res, next) => {
 
     if(req.query.limit) constraints.limit = parseInt(req.query.limit);
 
+    // findAndCountAll returns Promise<{ count: number, rows: Model[] }>
     return Company.findAndCountAll({
         attributes: [ 
             'id', 
@@ -474,65 +475,42 @@ exports.getCompanies = (req, res, next) => {
         ...constraints,
         distinct: true,
         include: [
-            {
-                model: Job
-            }, 
-            {
-                model: Address
-            },
-            {
-                model: Person
-            }
+            { model: Job }, 
+            { model: Address },
+            { model: Person }
         ]
-            
     }).then(results => {
-        if(!results) {
-            const error = new Error('Cannot get Companies');
-            error.statusCode = 422;
-            throw error;
-        }
         results.rows = results.rows.map((
             { 
-                dataValues: { 
-                    id, 
-                    name, 
-                    companyDate, 
-                    addresses, 
-                    people,
-                }
+                dataValues: { id, name, companyDate, addresses, people }
         }) => { 
-
             people = people.map(({ firstName, lastName, id: personId, email, phone, contact: { position, id: contactId } }) =>  { 
                 return { personId, firstName, lastName, email, phone, position, contactId };
             });
         
             addresses = addresses.map(( { 
-                dataValues: {
-                    id: addressId,
-                    firstLine,
-                    secondLine,
-                    city,
-                    county,
-                    postcode
-                }
-            }  ) => { 
+                dataValues: { id: addressId, firstLine, secondLine, city, county, postcode }
+            }) => { 
                 return { addressId, firstLine, secondLine, city, county, postcode }
             });
+
             return { id, name, companyDate, addresses, people }; 
         });
+
         res.status(200).json({ companies: results.rows, total: results.count });
         return;
     }).catch(err => {
-        if(!err.statusCode) err.statusCode = 500;
+        if(!err.statusCode) err.statusCode = 500; 
         next(err);
         return err;
     });
 };
 
 exports.getCompany = (req, res, next) => {
-    return Company.findByPk(req.params.id, {
+
+    // Returns Promise<Model || null>
+    return Company.findByPk(req.params.id, { 
         include: Address
-        
     }).then(company => {
         if(!company) {
             const error = new Error('Could not find the company');
@@ -565,8 +543,12 @@ exports.createCompany = async(req, res, next) => {
         // Wrap db functions in transaction callback, passing t to each call option object
         await sequelize.transaction(async (t) => {
 
+            // Returns Promise<Model>
             const company = await Company.create({ name: req.body.companyName }, { transaction: t });
 
+            if(!company) { const err = new Error('Error creating Company'); throw err; }
+
+            // Returns Promise<Model>
             const person = await Person.create({ 
                 firstName: req.body.firstName,
                 lastName: req.body.lastName,
@@ -574,8 +556,9 @@ exports.createCompany = async(req, res, next) => {
                 email: req.body.email
             }, { transaction: t });
 
-    
+            if(!person) { const err = new Error('Error creating Person'); throw err; }
 
+            // Returns Promise<Model>
             const address = await Address.create({
                 firstLine: req.body.firstLine,
                 secondLine: req.body.secondLine,
@@ -584,13 +567,14 @@ exports.createCompany = async(req, res, next) => {
                 postcode: req.body.postcode
             }, { transaction: t });
 
+            if(!address) { const err = new Error('Error creating Address'); throw err; }
+
             await company.addPeople(person, { through: { position: req.body.position }, transaction: t});
             await company.addAddresses(address, { transaction: t });
 
             res.status(201).json({ msg: 'Success', company: company });
         
             return;
-    
         });
     
       // Transaction committed successfully
@@ -619,20 +603,19 @@ exports.deleteCompany = (req, res, next) => {
                         throw error;
                     }
                     company = result;
+                    console.log(company.getPeople());
+                    // Returns Promise<[Person]>
                     return company.getPeople({transaction: t});
                 })
                 .then(people => {
-                    if(!people) {
-                        const error = new Error('Error deleting contacts');
+                    if(people.length < 1) {
+                        const error = new Error('Error deleting contacts. Please contact admininstrator');
                         error.statusCode = 500;
                         throw error;
                     }
                     const ids = people.map(person => person.dataValues.id);
 
-                    // If people is an empty array, just return it, else destroy the records
-                    if(people.length === 0) return people;
-                    else return Person.destroy({ where: { id: ids }, transaction: t });
-
+                    return Person.destroy({ where: { id: ids }, transaction: t });
                 }).then(result => {
                     if(!result) {
                         const error = new Error('Error deleting contacts');
@@ -689,10 +672,97 @@ exports.deleteCompany = (req, res, next) => {
         res.status(200).json({msg: 'Company Deleted'});
         return;
     }).catch(err => {
-        if(!err.statusCode) err.statusCode = 500;
+        if(!err.statusCode) err.statusCode = 500; 
         next(err);
         return err;
     });;
 
 
 };
+
+exports.editCompany = async (req, res, next) => {
+    console.log(req.params);
+    try {
+        const errors = validationResult(req);
+
+        if(!errors.isEmpty()) {
+            const error = new Error('Validation Error');
+            error.validationErrors = errors.errors;
+            error.statusCode = 422;
+            throw error;
+        }
+console.log(req.params.contactId, req.params.addressId);
+        if((!req.params.contactId && parseInt(req.params.contactId) !== 0) || (!req.params.addressId && parseInt(req.params.addressId) !== 0 )) {
+            const error = new Error('Error editing Company');
+            error.statusCode = 400;
+            throw error;
+        }
+
+        await sequelize.transaction(async(t) => {
+            const company = await Company.findByPk(req.params.id, {
+                include: [
+                    { model: Address },
+                    { model: Person },
+                ]
+            });
+
+            if(!company) {
+                const err = new Error('Company not found');
+                err.statusCode = 422;
+                throw err;
+            }
+
+            // Check if there's an array of people
+            if(company.people.length === 0 || !company.people ) throw new Error('Error editing Company');
+
+            // Check if a valid contact ID has been provided
+            const person = company.people.find(person => person.id === parseInt(req.params.contactId));
+            if(!person) {
+                const error = new Error('Error editing Company');
+                error.statusCode = 422;
+                throw error;
+            }
+
+            // Check if there's an array of addresses
+            if(company.addresses.length === 0 || !company.addresses) throw new Error('Error editing Company');
+
+            // Check if a valid address ID has been provided
+            const address = company.addresses.find(address => address.id === parseInt(req.params.addressId))
+            if(!address) {
+                const error = new Error('Error editing Company');
+                error.statusCode = 422;
+                throw error;
+            }
+
+            const personIndex = company.people.indexOf(person);
+            const addressIndex = company.addresses.indexOf(address);
+
+            company.name = req.body.companyName;
+            company.people[personIndex].firstName = req.body.firstName;
+            company.people[personIndex].lastName = req.body.lastName;
+            company.people[personIndex].contact.position = req.body.position;
+            company.people[personIndex].phone = req.body.phone;
+            if(req.body.email !== company.people[personIndex].email) company.people[personIndex].email = req.body.email;
+            company.addresses[addressIndex].firstLine = req.body.firstLine;
+            company.addresses[addressIndex].secondLine = req.body.secondLine;
+            company.addresses[addressIndex].city = req.body.city;
+            company.addresses[addressIndex].county = req.body.county;
+            company.addresses[addressIndex].postcode = req.body.postcode;
+
+            await company.save();
+            await company.people[personIndex].save();
+            await company.people[personIndex].contact.save();
+            await company.addresses[addressIndex].save();
+
+            res.status(200).json({ msg: 'Company successfully updated', company });
+        });
+
+        return;
+    } catch(err) {
+        console.log(err);
+        if(!err.statusCode) err.statusCode = 500;
+        next(err);
+        return err;
+    }
+
+};  
