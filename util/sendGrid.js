@@ -2,20 +2,16 @@ const sgMail = require('@sendgrid/mail');
 
 sgMail.setApiKey(process.env.SEND_GRID_KEY);
 
-exports.sendEmail = (content) => {
+// https://docs.sendgrid.com/ui/account-and-settings/how-to-set-up-domain-authentication
+
+exports.sendEmail = (subject, message, author) => {
     const msg = {
-        to: process.env.MY_EMAIL,
+        to: process.env.TARGET_EMAIL,
         from: process.env.MY_EMAIL,
-        subject: 'test',
-        test: content,
-        html: '<strong>THIS IS THE HTML TAG</strong>'
+        replyTo: author,
+        subject: subject,
+        html: `<strong>${message}</strong>`
     };
 
-    sgMail
-        .send(msg)
-        .then(() => {
-            console.log('email sent');
-        })
-        .catch(err => console.log(err))
-
+    return sgMail.send(msg);
 }

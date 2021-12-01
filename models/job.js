@@ -30,6 +30,18 @@ const Job = sequelize.define('job', {
         type: Sequelize.BOOLEAN,
         allowNull: false
     },
+    jobType: {
+        type: Sequelize.STRING,
+        allowNull: false
+    },
+    position: {
+        type: Sequelize.STRING,
+        allowNull: false
+    },    
+    pqe: {
+        type: Sequelize.STRING,
+        allowNull: false
+    },
     createdAt: {
         type: Sequelize.DATE(3),
         allowNull: false,

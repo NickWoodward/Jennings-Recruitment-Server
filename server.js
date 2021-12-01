@@ -13,16 +13,17 @@ const conversations = require('./controllers/conversations');
 const startServer = async( mode ) => {
     if(mode) {
         await createDatabaseAssociations();
-        await sequelize.sync({ force: true });
+        await sequelize.sync({force: true});
         await populateDB();
     } else {
+        await createDatabaseAssociations();
         await sequelize.sync();
     }
 
     const server = app.listen(process.env.SERVER_PORT);
 };
 
-startServer('dev');
+startServer();
 
 
     // .then(async result => {

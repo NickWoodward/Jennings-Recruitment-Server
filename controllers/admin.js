@@ -246,6 +246,9 @@ exports.getJobs = (req, res, next) => {
             'wage',
             'location',
             'description',
+            'jobType',
+            'position',
+            'pqe',
             'featured',
             'createdAt',
             [Sequelize.fn('date_format', Sequelize.col('job.createdAt'), '%d/%m/%y'), 'jobDate'],
@@ -280,7 +283,7 @@ exports.getJobs = (req, res, next) => {
     .then(results => {
         results.rows = results.rows.map(({
             dataValues: {
-                id, title, wage, location, description, featured, jobDate, companyId,
+                id, title, wage, location, description, featured, jobDate, companyId, jobType, position, pqe,
                 company: { name: companyName },
                 applicants,
             }
@@ -299,6 +302,9 @@ exports.getJobs = (req, res, next) => {
                 location, 
                 description, 
                 featured, 
+                jobType,
+                position,
+                pqe,
                 jobDate,
                 companyId, 
                 companyName, 
@@ -322,11 +328,11 @@ exports.getJobs = (req, res, next) => {
 // @TODO: Check that other control methods follow this format for error handling
 exports.editJob = (req, res, next) => {
     const errors = validationResult(req);
-
     if(!errors.isEmpty()) {
         const error = new Error();
         error.message = 'Validation Error';
         error.statusCode = 422;
+        error.validationErrors = errors.array({ onlyFirstError: true });
         throw (error);
     }
     return Job.findOne({
@@ -345,7 +351,10 @@ exports.editJob = (req, res, next) => {
         job.description = req.body.description;
         job.featured = req.body.featured;
         job.companyId = req.body.companyId;
-
+        job.jobType = req.body.jobType;
+        job.position = req.body.position;
+        job.pqe = req.body.pqe;
+        
         return job.save();
     })
     .then(job => {
@@ -369,11 +378,13 @@ exports.createJob = (req, res, next) => {
     const errors = validationResult(req);
 
     if(!errors.isEmpty()) {
+        console.log('Validation Error');
         const error = new Error('Validation Error');
-        error.validationErrors = errors.errors;
+        error.validationErrors = errors.array({ onlyFirstError: true });
         error.statusCode = 422;
         throw error;
     }
+    console.log('success');
 
     // Check to see if a related company exists
     const job = Company.findByPk(req.body.companyId).then(result => {
@@ -387,6 +398,9 @@ exports.createJob = (req, res, next) => {
             title: req.body.title,
             wage: req.body.wage,
             location: req.body.location,
+            jobType: req.body.jobType,
+            position: req.body.position,
+            pqe: req.body.pqe,
             description: req.body.description,
             featured: req.body.featured
         })
@@ -401,6 +415,7 @@ exports.createJob = (req, res, next) => {
         return;
     }).catch(err => {
         if(!err.statusCode) err.statusCode = 500;
+        console.log(err);
         next(err);
         return err;
     });
@@ -589,9 +604,10 @@ exports.createCompany = async(req, res, next) => {
     }
 };
     
-exports.deleteCompany = (req, res, next) => {
+exports.deleteCompany =  (req, res, next) => {
     let company;
-    
+
+    console.log(req.params);
     return sequelize.transaction(function(t) {
         return (
             Company
@@ -603,7 +619,7 @@ exports.deleteCompany = (req, res, next) => {
                         throw error;
                     }
                     company = result;
-                    console.log(company.getPeople());
+                    console.log(company);
                     // Returns Promise<[Person]>
                     return company.getPeople({transaction: t});
                 })
@@ -681,7 +697,8 @@ exports.deleteCompany = (req, res, next) => {
 };
 
 exports.editCompany = async (req, res, next) => {
-    console.log(req.params);
+
+    console.log(req.body);
     try {
         const errors = validationResult(req);
 
@@ -691,7 +708,7 @@ exports.editCompany = async (req, res, next) => {
             error.statusCode = 422;
             throw error;
         }
-console.log(req.params.contactId, req.params.addressId);
+
         if((!req.params.contactId && parseInt(req.params.contactId) !== 0) || (!req.params.addressId && parseInt(req.params.addressId) !== 0 )) {
             const error = new Error('Error editing Company');
             error.statusCode = 400;
@@ -713,23 +730,25 @@ console.log(req.params.contactId, req.params.addressId);
             }
 
             // Check if there's an array of people
-            if(company.people.length === 0 || !company.people ) throw new Error('Error editing Company');
+            if(company.people.length === 0 || !company.people ) throw new Error('Error editing Company1');
 
             // Check if a valid contact ID has been provided
             const person = company.people.find(person => person.id === parseInt(req.params.contactId));
+            console.log(company.people[0].id, req.params.contactId);
+
             if(!person) {
-                const error = new Error('Error editing Company');
+                const error = new Error('Error editing Company2');
                 error.statusCode = 422;
                 throw error;
             }
 
             // Check if there's an array of addresses
-            if(company.addresses.length === 0 || !company.addresses) throw new Error('Error editing Company');
+            if(company.addresses.length === 0 || !company.addresses) throw new Error('Error editing Company3');
 
             // Check if a valid address ID has been provided
             const address = company.addresses.find(address => address.id === parseInt(req.params.addressId))
             if(!address) {
-                const error = new Error('Error editing Company');
+                const error = new Error('Error editing Company4');
                 error.statusCode = 422;
                 throw error;
             }
@@ -742,7 +761,8 @@ console.log(req.params.contactId, req.params.addressId);
             company.people[personIndex].lastName = req.body.lastName;
             company.people[personIndex].contact.position = req.body.position;
             company.people[personIndex].phone = req.body.phone;
-            if(req.body.email !== company.people[personIndex].email) company.people[personIndex].email = req.body.email;
+   
+            if((req.body.email !== company.people[personIndex].email)) company.people[personIndex].email = req.body.email;
             company.addresses[addressIndex].firstLine = req.body.firstLine;
             company.addresses[addressIndex].secondLine = req.body.secondLine;
             company.addresses[addressIndex].city = req.body.city;

@@ -42,6 +42,27 @@ router.post('/edit/job/:id', multer().none(),
         .escape()
         .isLength({ min: 3, max: 50 })
         .withMessage('Enter a location between 3 and 50 characters'),
+    body('jobType')
+        .isString()
+        .withMessage('Please enter alphanumeric characters')
+        .isLength({ min: 2, max: 50})
+        .withMessage('Job Type must be between 2 and 50 characters')
+        .trim()
+        .escape(),
+    body('position')
+        .isString()
+        .withMessage('Please enter alphanumeric characters')
+        .isLength({ min: 2, max: 50})
+        .withMessage('Position must be between 2 and 50 characters')
+        .trim()
+        .escape(),
+    body('pqe')
+        .isString()
+        .withMessage('Please enter alphanumeric characters')
+        .isLength({ min: 2, max: 50})
+        .withMessage('PQE must be between 2 and 50 characters')
+        .trim()
+        .escape(),
     body('description')
         .trim()
         .escape()
@@ -152,31 +173,52 @@ router.post('/edit/company/:id/:contactId/:addressId', multer().none(),
 adminController.editCompany);
 
 
-router.post('/create/job', multer().none(), 
+// @TODO: Update validation
+router.post('/create/job', multer().none(),
     [ 
         body('title')
-            .trim()
-            .escape()
             .isString()
             .isLength({ min: 3, max: 50 })
-            .withMessage('Enter a title between 3 and 50 characters'),
-        body('wage')
+            .withMessage('Enter a title between 3 and 50 characters')
             .trim()
-            .escape()
+            .escape(),
+        body('wage')
             .isFloat()
             .withMessage('Enter a number')
             .isLength({ min: 5, max: 8 })
             .withMessage('Wage must be over 5 digits'),
+            
         body('location')
-            .trim()
-            .escape()
             .isLength({ min: 3, max: 50 })
-            .withMessage('Enter a location between 3 and 50 characters'),
-        body('description')
+            .withMessage('Enter a location between 3 and 50 characters')
             .trim()
-            .escape()
+            .escape(),
+        body('jobType')
+            .isString()
+            .withMessage('Please enter alphanumeric characters')
+            .isLength({ min: 2, max: 50})
+            .withMessage('Job Type must be between 2 and 50 characters')
+            .trim()
+            .escape(),
+        body('position')
+            .isString()
+            .withMessage('Please enter alphanumeric characters')
+            .isLength({ min: 2, max: 50})
+            .withMessage('Position must be between 2 and 50 characters')
+            .trim()
+            .escape(),
+        body('pqe')
+            .isString()
+            .withMessage('Please enter alphanumeric characters')
+            .isLength({ min: 2, max: 50})
+            .withMessage('PQE must be between 2 and 50 characters')
+            .trim()
+            .escape(),
+        body('description')
             .isLength({ min: 5, max: 500 })
-            .withMessage('Enter a description between 5 and 500 characters'),
+            .withMessage('Enter a description between 5 and 500 characters')
+            .trim()
+            .escape(),
         body('featured')      
         .isFloat({ gt: -1, lt: 2 })
         .withMessage('Enter either a 0 or 1')

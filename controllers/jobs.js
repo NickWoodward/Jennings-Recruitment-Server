@@ -145,20 +145,55 @@ exports.getJobs = (req, res, next) => {
     const limit = req.query.limit || 10;
     const titles = req.query.titles;
     const locations = req.query.locations;
+    let salaries = req.query.salaries;
+    const types = req.query.types;
     const orderField = req.query.orderField;
     const orderDirection = req.query.orderDirection;
+
+
 
     const whereOptions = {};
 
     if(titles) whereOptions.title = { [Sequelize.Op.or]: titles};
     if(locations) whereOptions.location = { [Sequelize.Op.or]: locations };
+    if(salaries) {
+        salaries = req.query.salaries.map(s=> { 
+            // Salaries comes in as an array of strings ['[20,30]','[1,2]']
+            return {[Sequelize.Op.between]: JSON.parse(s) }
+        });
+        whereOptions.wage = { [Sequelize.Op.or]: salaries }
+    }
+    console.log(salaries);
+
+    // if(salaries) {
+    //     whereOptions.salaries = { 
+    //         [Sequelize.Op.or]: {
+    //             [Sequelize.Op.between]: // salaries[0]
+    //             [Sequelize.Op.between]: // salaries[1]
+    //             [Sequelize.Op.between]: // salaries[2]
+    //         } 
+    //     }
+    // }
 
     // Return Jobs
     Job.findAll({
         where: whereOptions,
         limit: parseInt(limit, 10),
         offset: parseInt(index),
-        // order: [[orderField, orderDirection]]
+        order: [[orderField, orderDirection]],
+
+        attributes: [ 
+            'id', 
+            'title',
+            'wage',
+            'location',
+            'description',
+            'jobType',
+            'position',
+            'pqe',
+            'createdAt',
+            [Sequelize.fn('date_format', Sequelize.col('job.createdAt' ), '%d/%m/%y'), 'jobDate'],
+        ],
     })
     .then(response => {
         res.status(200).json({
@@ -172,15 +207,15 @@ exports.getJobs = (req, res, next) => {
 
 exports.getMenuData = (req, res, next) => {
     Job.findAll({
-        attributes: ['title', 'location'],
+        attributes: ['id', 'title', 'location'],
         group: ['title', 'location']
     })
     // Job.aggregate('title', 'DISTINCT', { plain: false })
     .then(response => {
-        const titles = response.map(job => job.dataValues.title);
+        const titles = response.map(job => ({ id: job.id, title: job.dataValues.title }));
         const uniqueTitles = [...new Set(titles)];
 
-        const locations = response.map(location => location.dataValues.location);
+        const locations = response.map(location => ({ id: location.id, location: location.dataValues.location}));
         const uniqueLocations = [...new Set(locations)];
         
         res.status(200).json({
