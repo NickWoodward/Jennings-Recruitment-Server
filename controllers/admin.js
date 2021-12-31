@@ -325,26 +325,33 @@ exports.getJobs = (req, res, next) => {
 
 };
 
-// @TODO: Check that other control methods follow this format for error handling
-exports.editJob = (req, res, next) => {
-    const errors = validationResult(req);
-    if(!errors.isEmpty()) {
-        const error = new Error();
-        error.message = 'Validation Error';
-        error.statusCode = 422;
-        error.validationErrors = errors.array({ onlyFirstError: true });
-        throw (error);
-    }
-    return Job.findOne({
-        where: { id: req.params.id },
-        include: Company 
-    })
-    .then(job => {
-        if(!job) {
-            const error = new Error('Job not found');
+exports.editJob = async (req, res, next) => {
+
+
+    try {
+        const errors = validationResult(req);
+
+        if(!errors.isEmpty()) {
+            const error = new Error();
+            error.message = 'Validation Error';
             error.statusCode = 422;
-            throw error;
+            error.validationErrors = errors.array({ onlyFirstError: true });
+            throw (error);
         }
+    
+        console.log(req.body.dataValues)
+
+        const job = await Job.findOne({
+            where: { id: req.params.id },
+            include: Company 
+        });
+
+        if(!job) {
+            const err = new Error('Error editing Job');
+            err.statusCode = 422;
+            throw err;
+        }
+
         job.title = req.body.title;
         job.wage = req.body.wage;
         job.location = req.body.location;
@@ -353,25 +360,62 @@ exports.editJob = (req, res, next) => {
         job.companyId = req.body.companyId;
         job.jobType = req.body.jobType;
         job.position = req.body.position;
-        job.pqe = req.body.pqe;
-        
-        return job.save();
-    })
-    .then(job => {
-        if(!job) {
-            const error = new Error('Error editing the job');
-            error.statusCode = 422;
-            throw error;
-        }
+        job.pqe = parseInt(req.body.pqe);
+
+
+        await job.save();
 
         res.status(200).json({ message: 'Job edited', job: job });
-        return;
-    })
-    .catch(err => {
+
+
+    } catch(err) {
         if(!err.statusCode) err.statusCode = 500;
         next(err);
         return err;
-    });
+    }
+
+    // return Job.findOne({
+    //     where: { id: req.params.id },
+    //     include: Company 
+    // })
+    // .then(job => {
+    //     if(!job) {
+    //         const error = new Error('Job not found');
+    //         error.statusCode = 422;
+    //         throw error;
+    //     }
+    //     job.title = req.body.title;
+    //     job.wage = req.body.wage;
+    //     job.location = req.body.location;
+    //     job.description = req.body.description;
+    //     job.featured = req.body.featured;
+    //     job.companyId = req.body.companyId;
+    //     job.jobType = req.body.jobType;
+    //     job.position = req.body.position;
+    //     job.pqe = req.body.pqe;
+    //     console.log(job.title);
+    //     console.log("HELLO");
+    //     console.log(job.title, job.wage, job.location, job.description, job.featured);
+
+    //     console.log(job.dataValues);
+    //     return job.save();
+    // })
+    // .then(job => {
+    //     console.log('test');
+    //     if(!job) {
+    //         const error = new Error('Error editing the job');
+    //         error.statusCode = 422;
+    //         throw error;
+    //     }
+
+    //     res.status(200).json({ message: 'Job edited', job: job });
+    //     return;
+    // })
+    // .catch(err => {
+    //     if(!err.statusCode) err.statusCode = 501;
+    //     next(err);
+    //     return err;
+    // });
 };
 
 exports.createJob = (req, res, next) => {
@@ -400,7 +444,7 @@ exports.createJob = (req, res, next) => {
             location: req.body.location,
             jobType: req.body.jobType,
             position: req.body.position,
-            pqe: req.body.pqe,
+            pqe: parseInt(req.body.pqe),
             description: req.body.description,
             featured: req.body.featured
         })

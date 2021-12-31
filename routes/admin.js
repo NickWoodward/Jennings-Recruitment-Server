@@ -59,7 +59,7 @@ router.post('/edit/job/:id', multer().none(),
     body('pqe')
         .isString()
         .withMessage('Please enter alphanumeric characters')
-        .isLength({ min: 2, max: 50})
+        .isLength({ min: 1, max: 50})
         .withMessage('PQE must be between 2 and 50 characters')
         .trim()
         .escape(),

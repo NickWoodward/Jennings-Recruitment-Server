@@ -39,7 +39,7 @@ const Job = sequelize.define('job', {
         allowNull: false
     },    
     pqe: {
-        type: Sequelize.STRING,
+        type: Sequelize.INTEGER,
         allowNull: false
     },
     createdAt: {

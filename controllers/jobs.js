@@ -139,19 +139,19 @@ exports.getJob = (req, res, next) => {
 };
 
 exports.getJobs = (req, res, next) => {
-    console.log(req.session.isLoggedIn);
-    console.log(req.session.user);
+    // console.log(req.session.isLoggedIn);
+    // console.log(req.session.user);
     const index = req.query.index || 0;
     const limit = req.query.limit || 10;
     const titles = req.query.titles;
     const locations = req.query.locations;
     let salaries = req.query.salaries;
     const types = req.query.types;
+    let pqes = req.query.pqes;
     const orderField = req.query.orderField;
     const orderDirection = req.query.orderDirection;
 
-
-
+    console.log('NEW JOBS');
     const whereOptions = {};
 
     if(titles) whereOptions.title = { [Sequelize.Op.or]: titles};
@@ -163,17 +163,19 @@ exports.getJobs = (req, res, next) => {
         });
         whereOptions.wage = { [Sequelize.Op.or]: salaries }
     }
-    console.log(salaries);
+    if(types) whereOptions.jobType = { [Sequelize.Op.or]: types };
+    if(pqes) {
 
-    // if(salaries) {
-    //     whereOptions.salaries = { 
-    //         [Sequelize.Op.or]: {
-    //             [Sequelize.Op.between]: // salaries[0]
-    //             [Sequelize.Op.between]: // salaries[1]
-    //             [Sequelize.Op.between]: // salaries[2]
-    //         } 
-    //     }
-    // }
+        pqes = pqes.map(pqe => { return parseInt(pqe) });
+        // Find the lowest pqe
+        const lowest = pqes.reduce((acc, item) => item < acc? item:acc );
+        whereOptions.pqe = { 
+            [Sequelize.Op.and]: {
+                [Sequelize.Op.gt]: lowest 
+            }
+        };
+    }
+    
 
     // Return Jobs
     Job.findAll({
@@ -196,6 +198,7 @@ exports.getJobs = (req, res, next) => {
         ],
     })
     .then(response => {
+        response.forEach(res => console.log(res.dataValues.id));
         res.status(200).json({
             jobs: response,
             message: `${response.length} ${response.length === 1? ' job':' jobs'} found`,
@@ -213,18 +216,41 @@ exports.getMenuData = (req, res, next) => {
     // Job.aggregate('title', 'DISTINCT', { plain: false })
     .then(response => {
         const titles = response.map(job => ({ id: job.id, title: job.dataValues.title }));
-        const uniqueTitles = [...new Set(titles)];
+        // const uniqueTitles = [...new Set(titles)];
 
         const locations = response.map(location => ({ id: location.id, location: location.dataValues.location}));
-        const uniqueLocations = [...new Set(locations)];
+        // const uniqueLocations = [...new Set(locations)];
         
         res.status(200).json({
-            response: { uniqueTitles, uniqueLocations }
+            response: { 
+                uniqueTitles: removeDuplicates(titles, 'title'), 
+                uniqueLocations: removeDuplicates(locations, 'location') 
+            }
         })
     })
     .catch(err => console.log(err));
 };
 
+function removeDuplicates(originalArray, propertyFilter) {
+    const newArr = [];
+
+    // { property: { id, property } }
+    const lookupObj = {};
+
+    // Extract the property filter prop out of the objects in the original array into the lookup object
+    // Dupes will be removed
+    originalArray.forEach((item, index) => {
+        lookupObj[originalArray[index][propertyFilter]] = originalArray[index];
+    });
+
+    // Loop back over the object and push value to new array
+    for(const i in lookupObj) {
+        // console.log(lookupObj[i]);
+        newArr.push(lookupObj[i]);
+    }
+
+    return newArr;
+}
 
 function countJobs() {
     Job.findAll().then((jobs) => {
