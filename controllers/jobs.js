@@ -6,7 +6,7 @@ const Job = require('../models/job');
 const io = require('../util/socket');
 
 
-let totalJobs = countJobs();
+let totalJobs;
 
 exports.editJob = (req, res, next) => {
     const errors = validationResult(req);
@@ -66,7 +66,6 @@ exports.createJob = (req, res, next) => {
     .then(job => {
         const jobId = job.dataValues.id;
         const createdAt = job.dataValues.createdAt;
-        totalJobs++;
 
         io.getIO().emit('job', { action: 'create', job: {jobId, title, wage, location} });
 
@@ -138,7 +137,7 @@ exports.getJob = (req, res, next) => {
         });
 };
 
-exports.getJobs = (req, res, next) => {
+exports.getJobs = async (req, res, next) => {
     // console.log(req.session.isLoggedIn);
     // console.log(req.session.user);
     const index = req.query.index || 0;
@@ -151,7 +150,6 @@ exports.getJobs = (req, res, next) => {
     const orderField = req.query.orderField;
     const orderDirection = req.query.orderDirection;
 
-    console.log('NEW JOBS');
     const whereOptions = {};
 
     if(titles) whereOptions.title = { [Sequelize.Op.or]: titles};
@@ -177,35 +175,52 @@ exports.getJobs = (req, res, next) => {
     }
     
 
-    // Return Jobs
-    Job.findAll({
-        where: whereOptions,
-        limit: parseInt(limit, 10),
-        offset: parseInt(index),
-        order: [[orderField, orderDirection]],
 
-        attributes: [ 
-            'id', 
-            'title',
-            'wage',
-            'location',
-            'description',
-            'jobType',
-            'position',
-            'pqe',
-            'createdAt',
-            [Sequelize.fn('date_format', Sequelize.col('job.createdAt' ), '%d/%m/%y'), 'jobDate'],
-        ],
-    })
-    .then(response => {
-        response.forEach(res => console.log(res.dataValues.id));
-        res.status(200).json({
-            jobs: response,
-            message: `${response.length} ${response.length === 1? ' job':' jobs'} found`,
-            totalJobs: totalJobs
+    // Return Jobs
+    try {   
+        const jobs = await Job.findAll({
+            where: whereOptions,
+            limit: parseInt(limit, 10),
+            offset: parseInt(index),
+            order: [[orderField, orderDirection]],
+
+            attributes: [ 
+                'id', 
+                'title',
+                'wage',
+                'location',
+                'description',
+                'jobType',
+                'position',
+                'pqe',
+                'createdAt',
+                [Sequelize.fn('date_format', Sequelize.col('job.createdAt' ), '%d/%m/%y'), 'jobDate'],
+            ],
         });
-    })
-    .catch(err => console.log(err));
+
+        const totalJobsInDB = await countJobs();
+
+        res.status(200).json({
+            jobs: jobs,
+            message: `${jobs.length} ${jobs.length === 1? ' job':' jobs'} found`,
+            totalJobs: jobs.length,
+            totalJobsInDB
+        });
+    } catch(err) {
+        console.log(err);
+    }
+
+
+
+    // .then(response => {
+    //     console.log(response.length);
+    //     res.status(200).json({
+    //         jobs: response,
+    //         message: `${response.length} ${response.length === 1? ' job':' jobs'} found`,
+    //         totalJobs: response.length
+    //     });
+    // })
+    // .catch(err => console.log(err));
 };
 
 exports.getMenuData = (req, res, next) => {
@@ -252,9 +267,19 @@ function removeDuplicates(originalArray, propertyFilter) {
     return newArr;
 }
 
-function countJobs() {
-    Job.findAll().then((jobs) => {
-        totalJobs = jobs.length;
-    })
-    .catch(err => console.log(err));
+async function countJobs() {
+    // return Job.findAll().then((jobs) => {
+    //     console.log(jobs.length);
+    //     totalJobs = jobs.length;
+    // })
+    // .catch(err => console.log(err));
+
+    try {
+        const jobs = await Job.findAll();
+        return jobs.length;
+
+    } catch(err) {
+        console.log(err)
+    }
+
 };

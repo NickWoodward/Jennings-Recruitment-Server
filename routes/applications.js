@@ -6,7 +6,7 @@ const { uploadFile } = require('../middleware/multer');
 const router = express.Router();
 
 // GET /applications/all
-router.get('/all', applicationController.getApplications);
+// router.get('/all', applicationController.getApplications);
 
 // POST /applications/apply/id
 router.post('/apply/:id', 

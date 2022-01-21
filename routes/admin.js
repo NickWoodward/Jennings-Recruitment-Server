@@ -14,7 +14,7 @@ router.get('/cvs/:applicantId', adminController.getCv);
 router.get('/jobs',adminController.getJobs);
 router.get('/companies', adminController.getCompanies);
 router.get('/company/:id', adminController.getCompany);
-
+router.get('/applications', adminController.getApplications);
 
 // @TODO: validation
 router.post('/create/applicant/', uploadFile('cv'), adminController.createApplicant);
@@ -210,7 +210,7 @@ router.post('/create/job', multer().none(),
         body('pqe')
             .isString()
             .withMessage('Please enter alphanumeric characters')
-            .isLength({ min: 2, max: 50})
+            .isLength({ min: 1, max: 50})
             .withMessage('PQE must be between 2 and 50 characters')
             .trim()
             .escape(),
