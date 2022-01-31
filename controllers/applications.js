@@ -81,6 +81,7 @@ exports.apply = (req, res, next) => {
         .then(hasApplied => {
             if(hasApplied) {
                 const error = new Error(`You've already applied to this job`);
+                error.email = currentPerson.email;
                 error.statusCode = 422;
                 throw error;
             }
@@ -90,11 +91,10 @@ exports.apply = (req, res, next) => {
             if(!application){
                 throw new Error('Error creating application. Please contact us directly');
             } else {
-                res.status(201).json({ msg: 'Application successful', ref: `Reference JRS-03-${application.id}` });
+                res.status(201).json({ msg: 'Application successful', ref: `JRS-03-${application[0].id}` });
             }
         }) 
         .catch(err => {
-            console.log(err);
             next(err)
         });
 };

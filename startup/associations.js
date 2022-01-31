@@ -38,6 +38,7 @@ exports.createDatabaseAssociations = () => {
     Applicant.belongsToMany(Job, { through: Application });
     Job.belongsToMany(Applicant, { through: Application });
 
+
     // Person M:N Company (through Contact)
     Person.belongsToMany(Company, { through: Contact });
     Company.belongsToMany(Person, { through: Contact });

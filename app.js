@@ -26,13 +26,14 @@ require('./startup/headers')(app);
 require('./startup/routes')(app);
 
 app.use((error, req, res, next) => {
+    console.log('error handler: ' + error.email);
     const status = error.statusCode || 500;
     console.log(error.validationErrors);
     // @TODO: fix
     const message = (status === 500 && process.env.NODE_ENV !== 'development' )? 'Please contact us directly':error.message;
     const validationErrors = error.validationErrors? error.validationErrors.map(({param, msg}) => { return {param, msg}}):[];
 
-    res.status(status).json({ message: `Caught in app.js ${message}`, error: validationErrors });
+    res.status(status).json({ message: `${message}`, validationErrors: validationErrors, email: error.email });
 });
 
 module.exports = app;

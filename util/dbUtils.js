@@ -24,6 +24,9 @@ exports.createDatabaseAssociations = () => {
     // Applicants M:N Jobs (through Application)
     Applicant.belongsToMany(Job, { through: Application });
     Job.belongsToMany(Applicant, { through: Application });
+    // Set associations so the Application table can be queried directly
+    Application.belongsTo(Job, { foreignKey: { name: 'jobId' }});
+    Application.belongsTo(Applicant, { foreignKey: { name: 'applicantId' } });
 
     // Person M:N Company (through Contact)
     Person.belongsToMany(Company, { through: Contact });

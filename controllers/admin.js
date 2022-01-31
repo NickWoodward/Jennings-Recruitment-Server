@@ -16,101 +16,103 @@ const Company = require('../models/company');
 // View magic methods 
 // console.log(Object.keys(obj.__proto__));
 
-exports.getApplications = async (req, res, next) => {
+exports.getApplications = async(req, res, next) => {
     const index = req.query.index || 0;
     const limit = req.query.limit || 10;
     const orderField = req.query.orderField || 'createdAt';
     const order = req.query.orderDirection || 'DESC';
 
-    console.log(index, limit);
-
-
-    const { rows, count } = await Application.findAndCountAll({ 
-        limit: parseInt(limit, 10), 
-        offset: parseInt(index), 
-        order: [[orderField, order]],
-        distinct: true 
-    });
-    let results = [];
-console.log(rows[0].id);
     try {
-        await Promise.all(rows.map(async (application) => {
-            const job = await Job.findOne({ where: { id: application.jobId }, include: { model: Company } });
-            const applicant = await Applicant.findOne({ where: { id: application.applicantId }, include: { model: Person } });
-            results.push({ 
-                applicationId: application.id,
-                companyId: job.companyId,
-                company: job.company.name,
-                jobId: job.id,
-                position: job.title,
-                applicantId: applicant.id,
-                personId: applicant.person.id,
-                firstName: applicant.person.firstName,
-                lastName: applicant.person.lastName,
-                email: applicant.person.email,
-                phone: applicant.person.phone,
-                cvUrl: applicant.cvUrl
-            });
-        }));
-        res.status(200).json({msg: 'success', applications: results, total: count});
+        const applications = await Application.findAndCountAll({
+            include: [
+                {                               
+                    model: Job,
+                    include: [ 
+                        { 
+                            model: Company,
+                            attributes: [ 'name' ]
+                        } 
+                    ]
+                },
+                {
+                    model: Applicant,
+                    include: [ 
+                        {
+                            model: Person,
+                            attributes: [ 'id', 'firstName', 'lastName', 'createdAt' ]
+                        } 
+                    ],
+                }
+            ],
 
-    } catch(err) {
+            subQuery: false,
+            order: [
+                ['applicant', 'person', 'lastName'], 
+                ['applicant', 'person', 'firstName'], 
+                
+                // lastName & firstName is not enough to get a unique order.
+                // In order to make sure the order is always same and pagination works properly,
+                // you should add either order by id or createdAt/updatedAt. 
+                ['applicant', 'createdAt', 'desc']
+
+            ],          
+            limit: parseInt(limit, 10), 
+            offset: parseInt(index),
+            attributes: [ 
+                'id',
+                'applicantId',
+                'jobId',
+                [Sequelize.fn('date_format', Sequelize.col('application.createdAt' ), '%d/%m/%y'), 'applicationDate']
+ 
+            ]
+        });
+
+        res.status(200).json({msg: 'success', applications: applications});
+
+    } catch (err) {
         console.log(err);
     }
+
 }
 
-// exports.getApplications = (req, res, next) => {
+// exports.getApplications = async (req, res, next) => {
 //     const index = req.query.index || 0;
 //     const limit = req.query.limit || 10;
+//     const orderField = req.query.orderField || 'createdAt';
+//     const order = req.query.orderDirection || 'DESC';
 
-//     Application.findAll({
-//         limit: parseInt(limit, 10),
-//         index: parseInt(index),
-//     }).then(applications => {
-//         applications.forEach(application => {
-//             Job.findOne({
-//                 where: {
-//                     id: application.jobId
-//                 }
-//             }).then(job => {
-//                 console.log(application.id, job.dataValues);
-//             })
-//         });
+//     const { rows, count } = await Application.findAndCountAll({ 
+//         limit: parseInt(limit, 10), 
+//         offset: parseInt(index), 
+//         order: [[orderField, order]],
+//         distinct: true 
 //     });
+//     let results = [];
 
-
-
-//     Job.findAll({ 
-//         limit: parseInt(limit, 10),
-//         offset: parseInt(index),
-//         include: [
-//             {
-//                 model: Applicant, 
-//                 include: { model: Person },
-               
-//                 // order: [ [Applicant,  'applicantId', 'DESC'] ]
-
-//             },
-//             Company
-//         ], 
-//         order: [ [ Applicant, Application,  'createdAt', 'DESC'] ]
-
-//     }).then(results => {
-//         // For each job, create an entry for each applicant to that job
-//         // console.log(`>`, util.inspect(results[0], true, 1, true));
-//         // console.log(Object.keys(results[0].__proto__));
-
-
-//         const jobEntries = results.map(({ dataValues, dataValues: { company: {name: companyName, id: companyId}, id: jobId, title, applicants } }, index) => {
-//             // console.log(`${index}>`, util.inspect(applicants[0], true, 2, true));
-
-//             const application = applicants.map(({ cvUrl, id:applicantId, personId, person: { firstName, lastName, email, phone }, application: {id:applicationId} }) =>  { 
-//                 return { company: companyName, companyId, applicationId, jobId, applicantId, position: title, personId, firstName, lastName, email, phone, cvUrl } 
+//     try {
+//         await Promise.all(rows.map(async (application) => {
+//             const job = await Job.findOne({ where: { id: application.jobId }, include: { model: Company } });
+//             const applicant = await Applicant.findOne({ where: { id: application.applicantId }, include: { model: Person } });
+//             results.push({ 
+//                 applicationId: application.id,
+//                 companyId: job.companyId,
+//                 company: job.company.name,
+//                 jobId: job.id,
+//                 position: job.title,
+//                 applicantId: applicant.id,
+//                 personId: applicant.person.id,
+//                 firstName: applicant.person.firstName,
+//                 lastName: applicant.person.lastName,
+//                 email: applicant.person.email,
+//                 phone: applicant.person.phone,
+//                 cvUrl: applicant.cvUrl
 //             });
-//             return application
-//         }).flat();
-//         res.status(200).json({msg: 'success', applications: jobEntries});
-//     }).catch(err => console.log(err));
+//         }));
+//         res.status(200).json({msg: 'success', applications: results, total: count});
+
+//     } catch(err) {
+//         console.log(err);
+//     }
 // }
 
 //@TODO: validation
