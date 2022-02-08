@@ -19,8 +19,31 @@ const Company = require('../models/company');
 exports.getApplications = async(req, res, next) => {
     const index = req.query.index || 0;
     const limit = req.query.limit || 10;
-    const orderField = req.query.orderField || 'createdAt';
+    // const orderField = req.query.orderField || 'createdAt';
     const order = req.query.orderDirection || 'DESC';
+
+    let orderFields;
+
+    switch(req.query.orderField) {
+        case 'lastName': 
+            orderFields = [
+                ['applicant', 'person', 'lastName'], 
+                ['applicant', 'person', 'firstName'], 
+                
+                // lastName & firstName is not enough to get a unique order.
+                // In order to make sure the order is always same and pagination works properly,
+                // you should add either order by id or createdAt/updatedAt. 
+                ['applicant', 'createdAt', order]
+
+            ];
+            break;
+        
+        default:
+            orderFields = [ 'createdAt' ];
+        
+    }
+
+    console.log(orderFields, order);
 
     try {
         const applications = await Application.findAndCountAll({
@@ -30,7 +53,7 @@ exports.getApplications = async(req, res, next) => {
                     include: [ 
                         { 
                             model: Company,
-                            attributes: [ 'name' ]
+                            attributes: [ 'id', 'name' ]
                         } 
                     ]
                 },
@@ -39,23 +62,24 @@ exports.getApplications = async(req, res, next) => {
                     include: [ 
                         {
                             model: Person,
-                            attributes: [ 'id', 'firstName', 'lastName', 'createdAt' ]
+                            attributes: [ 'id', 'firstName', 'lastName', 'email', 'phone', 'createdAt' ]
                         } 
                     ],
                 }
             ],
 
             subQuery: false,
-            order: [
-                ['applicant', 'person', 'lastName'], 
-                ['applicant', 'person', 'firstName'], 
+            // order: [
+            //     ['applicant', 'person', 'lastName'], 
+            //     ['applicant', 'person', 'firstName'], 
                 
-                // lastName & firstName is not enough to get a unique order.
-                // In order to make sure the order is always same and pagination works properly,
-                // you should add either order by id or createdAt/updatedAt. 
-                ['applicant', 'createdAt', 'desc']
+            //     // lastName & firstName is not enough to get a unique order.
+            //     // In order to make sure the order is always same and pagination works properly,
+            //     // you should add either order by id or createdAt/updatedAt. 
+            //     ['applicant', 'createdAt', 'desc']
 
-            ],          
+            // ],    
+            order: orderFields,      
             limit: parseInt(limit, 10), 
             offset: parseInt(index),
             attributes: [ 

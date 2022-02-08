@@ -45,6 +45,7 @@ uploadFile('cv'),
                 start != '01' && 
                 start != '02' &&
                 start != '03' &&
+                start != '05' &&
                 start != '08'
             ) throw new Error('Please enter a valid UK phone number');
             
