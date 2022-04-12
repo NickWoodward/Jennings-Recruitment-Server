@@ -21,7 +21,6 @@ exports.getApplications = async(req, res, next) => {
     const limit = req.query.limit || 10;
     // const orderField = req.query.orderField || 'createdAt';
     const order = req.query.orderDirection || 'DESC';
-
     let orderFields;
 
     switch(req.query.orderField) {
@@ -53,7 +52,13 @@ exports.getApplications = async(req, res, next) => {
                     include: [ 
                         { 
                             model: Company,
-                            attributes: [ 'id', 'name' ]
+                            attributes: [ 'id', 'name' ],
+                            include: [
+                                {
+                                    model: Person,
+                                    attributes: [ 'firstName', 'lastName', 'phone', 'email' ]
+                                }
+                            ]
                         } 
                     ]
                 },
@@ -82,6 +87,7 @@ exports.getApplications = async(req, res, next) => {
             order: orderFields,      
             limit: parseInt(limit, 10), 
             offset: parseInt(index),
+            // distinct: true,
             attributes: [ 
                 'id',
                 'applicantId',
@@ -90,7 +96,8 @@ exports.getApplications = async(req, res, next) => {
  
             ]
         });
-
+        console.log(applications.rows.length);
+        console.log(limit);
         res.status(200).json({msg: 'success', applications: applications});
 
     } catch (err) {
