@@ -1,14 +1,17 @@
 const Job = require('../models/job');
 const Person = require('../models/person');
 const Company = require('../models/company');
-const Contact = require('../models/contacts');
+const Contact = require('../models/contact');
 const Applicant = require('../models/applicant');
 const Application = require('../models/application');
 const Address = require('../models/address');
 const CompanyAddress = require('../models/companyAddress');
 
+
 //@TODO: Check these foriegn keys are correct in both
 exports.createDatabaseAssociations = () => {
+    console.log('Creating associations');
+
     // Companies 1:M Jobs
     Company.hasMany(Job, { foreignKey: { name: 'companyId', allowNull: false} });
     Job.belongsTo(Company, { foreignKey: { name: 'companyId', allowNull: false} });
@@ -24,13 +27,25 @@ exports.createDatabaseAssociations = () => {
     // Applicants M:N Jobs (through Application)
     Applicant.belongsToMany(Job, { through: Application });
     Job.belongsToMany(Applicant, { through: Application });
+
+    // Applicant.hasMany(Application, { foreignKey: 'applicantId', onDelete: 'CASCADE' });
+    // Job.belongsTo(Applicant, { foreignKey: 'applicantId', onDelete: 'CASCADE' });
+
     // Set associations so the Application table can be queried directly
     Application.belongsTo(Job, { foreignKey: { name: 'jobId' }});
     Application.belongsTo(Applicant, { foreignKey: { name: 'applicantId' } });
 
-    // Person M:N Company (through Contact)
-    Person.belongsToMany(Company, { through: Contact });
-    Company.belongsToMany(Person, { through: Contact });
+    // // // Person M:N Company (through Contact)
+    // Person.belongsToMany(Company, { through: Contact });
+    // Company.belongsToMany(Person, { through: Contact });
+
+    // **** association created to make a M:N relationship
+    Company.hasMany(Contact);
+    Contact.belongsTo(Person);
+    
+    // Person.hasMany(Contact)
+    // Contact.belongsTo(Company);
+    // ****
 }
 
 exports.populateDB = async() => {
@@ -71,25 +86,53 @@ exports.populateDB = async() => {
 
     await job2.addApplicant(applicant1);
     await job2.addApplicant(applicant2);
-    
+    await job2.addApplicant(applicant3);
+
     await job3.addApplicant(applicant3);
+    await job3.addApplicant(applicant1);
+    await job3.addApplicant(applicant2);
 
     await job4.addApplicant(applicant2);
+    await job4.addApplicant(applicant1);
+    await job4.addApplicant(applicant3);
+
+    // const application1 = await Application.create();
+    // application1.setApplicant(applicant1);
+    // application1.setJob(job1);
 
     // Contacts
     const person4 = await Person.create({ firstName: 'JJ', lastName: 'Jennings', phone: '074843732635', email: 'j@gmail.com' });
     const person5 = await Person.create({ firstName: 'Steff', lastName: 'Reed', phone: '074843732635', email: 'steff@gmail.com' });
-    await person4.addCompany(company1, { through: { position: 'CEO' } });
-    await person5.addCompany(company1, { through: { position: 'Head of HR' } });
+
+    // If using a many to many relationship
+    // await person4.addCompany(company1, { through: { position: 'CEO' } });
+    // await person5.addCompany(company1, { through: { position: 'Head of HR' } });
+
+    // Using a manual join table and one to many associations
+    const contact1 = await Contact.create({ position: 'CEO' });
+    console.log(Object.keys(company1.__proto__));
+
+    contact1.setPerson(person4);
+    company1.setContacts(contact1);
+    // contact1.setCompany(company1);
+
+
+
+    // console.log(Object.keys(person4.__proto__));
+    // console.log(Object.keys(contact1.__proto__));
+
+
+    // console.log(Object.keys(obj.__proto__));
+
 
     const person6 = await Person.create({ firstName: 'Dom', lastName: 'Rumbo', phone: '074843732635', email: 'rumbo@gmail.com' });
-    await person6.addCompany(company2, { through: { position: 'HR' } });
+    // await person6.addCompany(company2, { through: { position: 'HR' } });
 
     const person7 = await Person.create({ firstName: 'Ruth', lastName: 'Symonds', phone: '0736463748', email: 'ruth@gmail.com' });
-    await person7.addCompany(company3, { through: { position: 'Head of Gin' } });
+    // await person7.addCompany(company3, { through: { position: 'Head of Gin' } });
 
     const person8 = await Person.create({ firstName: 'Alex', lastName: 'May', phone: '0736463748', email: 'maylord@gmail.com' });
     const person9 = await Person.create({ firstName: 'John', lastName: 'Gantlett', phone: '0736463748', email: 'ganty@gmail.com' });
-    await person8.addCompany(company4, { through: { position: 'Head of HR' } });
-    await person9.addCompany(company4, { through: { position: 'HR' } });
+    // await person8.addCompany(company4, { through: { position: 'Head of HR' } });
+    // await person9.addCompany(company4, { through: { position: 'HR' } });
 }

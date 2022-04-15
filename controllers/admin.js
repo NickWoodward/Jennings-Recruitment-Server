@@ -8,7 +8,7 @@ const { validationResult } = require('express-validator');
 const Address = require('../models/address');
 const Application = require('../models/application');
 const Applicant = require('../models/applicant');
-const Contact = require('../models/contacts');
+const Contact = require('../models/contact');
 const Person = require('../models/person');
 const Job = require('../models/job');
 const Company = require('../models/company');
@@ -54,11 +54,24 @@ exports.getApplications = async(req, res, next) => {
                             model: Company,
                             attributes: [ 'id', 'name' ],
                             include: [
-                                {
-                                    model: Person,
-                                    attributes: [ 'firstName', 'lastName', 'phone', 'email' ]
-                                }
+                              {
+                                model: Contact,
+                                separate: true,
+                                // attributes: [],
+                                include: [{
+                                  model: Person,
+                                  attributes: [ 'firstName', 'lastName', 'phone', 'email' ]
+                                }]
+                              }
                             ]
+                            // model: Company,
+                            // attributes: [ 'id', 'name' ],
+                            // include: [
+                            //     {
+                            //         model: Person,
+                            //         attributes: [ 'firstName', 'lastName', 'phone', 'email' ]
+                            //     }
+                            // ]
                         } 
                     ]
                 },
@@ -73,21 +86,12 @@ exports.getApplications = async(req, res, next) => {
                 }
             ],
 
-            subQuery: false,
-            // order: [
-            //     ['applicant', 'person', 'lastName'], 
-            //     ['applicant', 'person', 'firstName'], 
-                
-            //     // lastName & firstName is not enough to get a unique order.
-            //     // In order to make sure the order is always same and pagination works properly,
-            //     // you should add either order by id or createdAt/updatedAt. 
-            //     ['applicant', 'createdAt', 'desc']
-
-            // ],    
+            // subQuery: false,
+               
             order: orderFields,      
             limit: parseInt(limit, 10), 
             offset: parseInt(index),
-            // distinct: true,
+            distinct: true,
             attributes: [ 
                 'id',
                 'applicantId',
@@ -101,6 +105,7 @@ exports.getApplications = async(req, res, next) => {
         res.status(200).json({msg: 'success', applications: applications});
 
     } catch (err) {
+        console.log('fuck');
         console.log(err);
     }
 
