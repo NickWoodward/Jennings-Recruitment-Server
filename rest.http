@@ -1,0 +1,5 @@
+# post http://localhost:8080/admin/create/application/1/2
+
+# get http://localhost:8080/admin/applications
+
+delete http://localhost:8080/admin/delete/application/1

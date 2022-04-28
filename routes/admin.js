@@ -19,6 +19,8 @@ router.get('/applications', adminController.getApplications);
 // @TODO: validation
 router.post('/create/applicant/', uploadFile('cv'), adminController.createApplicant);
 
+router.post('/create/application/:jobId/:personId', adminController.createApplication);
+
 // @TODO: validation
 router.post('/edit/applicant/:id', uploadFile('cv'), adminController.editApplicant);
 
@@ -331,6 +333,7 @@ router.post('/create/company', multer().none(), [
 adminController.createCompany);
 
 router.delete('/delete/applicant/:id', adminController.deleteApplicant);
+router.delete('/delete/application/:id', adminController.deleteApplication);
 router.delete('/delete/job/:id', adminController.deleteJob);
 router.delete('/delete/company/:id', adminController.deleteCompany);
 

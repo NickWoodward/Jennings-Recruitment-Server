@@ -60,6 +60,8 @@ exports.populateDB = async() => {
     const job2 = await Job.create({ title: 'Head of Legal', wage: '60000', location: 'Bristol', description: "Reporting directly into the Associate General Counsel for UK Home you will have a key role in driving the realisation of UK Home and the wider legal function's objectives, managing commercial and regulatory risk on a day to day basis and leading, motivating and developing the team of 4 lawyers.", featured: false, jobType: 'Permanent', position: 'Private Practice', pqe: 10, companyId: company1.id });
     const job3 = await Job.create({ title: 'Junior Legal Counsel', wage: '90000', location: 'Swindon', description: 'This is a great opportunity for a corporate/generalist lawyer to work for an entrepreneurial, growing and leading business across Europe.', featured: true, jobType: 'Interim', position: 'In House', pqe: 2, companyId: company2.id });
     const job4 = await Job.create({ title: 'Legal Counsel', wage: '50000', location: 'Swindon', description: 'A fast-growing gaming and sports betting company based in Central London is looking for an ambitious commercial lawyer to join their growing team as Legal Counsel.', featured: false, jobType: 'Interim', position: 'In House', pqe: 5, companyId: company2.id });
+    const job5 = await Job.create({ title: 'Head of HR', wage: '60000', location: 'Reading', description: 'A fast-growing gaming and sports betting company based in Central London is looking for an ambitious commercial lawyer to join their growing team as Legal Counsel.', featured: false, jobType: 'Interim', position: 'In House', pqe: 5, companyId: company2.id });
+
 
     // Addresses
     const address1 = await Address.create({ firstLine: 'Kemp House', secondLine: '152 city road', city: 'Bristol', county: 'Bristol', postcode: 'BS15 1PQ' });
@@ -109,30 +111,43 @@ exports.populateDB = async() => {
     // await person5.addCompany(company1, { through: { position: 'Head of HR' } });
 
     // Using a manual join table and one to many associations
+
+    // Person 4 => Contact for Company 1
     const contact1 = await Contact.create({ position: 'CEO' });
-    console.log(Object.keys(company1.__proto__));
+    await contact1.setPerson(person4);
+    await company1.setContacts(contact1);
 
-    contact1.setPerson(person4);
-    company1.setContacts(contact1);
-    // contact1.setCompany(company1);
-
-
-
-    // console.log(Object.keys(person4.__proto__));
-    // console.log(Object.keys(contact1.__proto__));
-
-
-    // console.log(Object.keys(obj.__proto__));
-
+    const contact2 = await Contact.create({ position: 'Head of HR' });
+    await contact2.setPerson(person5);
+    await company2.setContacts(contact2);
 
     const person6 = await Person.create({ firstName: 'Dom', lastName: 'Rumbo', phone: '074843732635', email: 'rumbo@gmail.com' });
+    // Using m:n
     // await person6.addCompany(company2, { through: { position: 'HR' } });
+    
+    // Using a manual join table
+    const contact3 = await Contact.create({ position: 'HR Manager' });
+    await contact3.setPerson(person6);
+    await company3.setContacts(contact3);
 
     const person7 = await Person.create({ firstName: 'Ruth', lastName: 'Symonds', phone: '0736463748', email: 'ruth@gmail.com' });
     // await person7.addCompany(company3, { through: { position: 'Head of Gin' } });
 
+    const contact4 = await Contact.create({position: 'Head of Gin'});
+    await contact4.setPerson(person7);
+    await company4.setContacts(contact4);
+
     const person8 = await Person.create({ firstName: 'Alex', lastName: 'May', phone: '0736463748', email: 'maylord@gmail.com' });
     const person9 = await Person.create({ firstName: 'John', lastName: 'Gantlett', phone: '0736463748', email: 'ganty@gmail.com' });
+
+    const contact5 = await Contact.create({ position: 'Head of HR' });
+    await contact5.setPerson(person8);
+    await company4.setContacts(contact5);
+
+    const contact6 = await Contact.create({ position: 'HR' });
+    await contact6.setPerson(person9);
+    await company4.setContacts(contact6);
+
     // await person8.addCompany(company4, { through: { position: 'Head of HR' } });
     // await person9.addCompany(company4, { through: { position: 'HR' } });
 }

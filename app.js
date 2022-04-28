@@ -27,13 +27,14 @@ require('./startup/routes')(app);
 
 app.use((error, req, res, next) => {
     console.log('error handler: ' + error.email);
+    const applicationId = error.applicationId;
     const status = error.statusCode || 500;
     console.log(error.validationErrors);
     // @TODO: fix
     const message = (status === 500 && process.env.NODE_ENV !== 'development' )? 'Please contact us directly':error.message;
     const validationErrors = error.validationErrors? error.validationErrors.map(({param, msg}) => { return {param, msg}}):[];
 
-    res.status(status).json({ message: `${message}`, validationErrors: validationErrors, email: error.email });
+    res.status(status).json({ message: `${message}`, validationErrors: validationErrors, email: error.email, data: { applicationId } });
 });
 
 module.exports = app;

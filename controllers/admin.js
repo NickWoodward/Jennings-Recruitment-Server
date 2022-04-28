@@ -16,33 +16,32 @@ const Company = require('../models/company');
 // View magic methods 
 // console.log(Object.keys(obj.__proto__));
 
+
 exports.getApplications = async(req, res, next) => {
     const index = req.query.index || 0;
     const limit = req.query.limit || 10;
-    // const orderField = req.query.orderField || 'createdAt';
-    const order = req.query.orderDirection || 'DESC';
-    let orderFields;
+    const orderField = req.query.orderField || 'createdAt';
+    const orderDirection = req.query.orderDirection || 'DESC';
+    let order;
 
     switch(req.query.orderField) {
         case 'lastName': 
-            orderFields = [
+            order = [
                 ['applicant', 'person', 'lastName'], 
                 ['applicant', 'person', 'firstName'], 
                 
                 // lastName & firstName is not enough to get a unique order.
                 // In order to make sure the order is always same and pagination works properly,
                 // you should add either order by id or createdAt/updatedAt. 
-                ['applicant', 'createdAt', order]
+                ['applicant', 'createdAt', orderDirection]
 
             ];
             break;
         
         default:
-            orderFields = [ 'createdAt' ];
+            order = [ orderField, orderDirection ];
         
     }
-
-    console.log(orderFields, order);
 
     try {
         const applications = await Application.findAndCountAll({
@@ -88,7 +87,7 @@ exports.getApplications = async(req, res, next) => {
 
             // subQuery: false,
                
-            order: orderFields,      
+            order: [order],      
             limit: parseInt(limit, 10), 
             offset: parseInt(index),
             distinct: true,
@@ -100,8 +99,7 @@ exports.getApplications = async(req, res, next) => {
  
             ]
         });
-        console.log(applications.rows.length);
-        console.log(limit);
+        
         res.status(200).json({msg: 'success', applications: applications});
 
     } catch (err) {
@@ -109,7 +107,75 @@ exports.getApplications = async(req, res, next) => {
         console.log(err);
     }
 
-}
+};
+
+exports.createApplication = async(req, res, next) => {
+    const jobId = req.params.jobId;
+    const applicantId = req.params.personId;
+
+    if(!jobId || !applicantId){
+        const error = new Error('No ID found');
+        error.statusCode = 422;
+        throw error;
+    }
+
+    try {
+        // Check if the application has already been made
+        const application = await Application.findAll({ 
+            where: {
+                applicantId: applicantId,
+                jobId: jobId
+            } 
+        });
+
+        if(application.length > 0) {
+
+            const error = new Error('Application already made');
+            error.statusCode = 422;
+            error.applicationId = application[0].id;
+            throw error;        
+        }
+
+        const job = await Job.findByPk(jobId);
+        const applicant = await Applicant.findByPk(applicantId);
+
+        if(!job || !applicant) {
+            const error = new Error('No Job or Applicant found');
+            error.statusCode = 422;
+            throw error;
+        }
+
+        await job.addApplicant(applicant);
+        res.status(200).json({ msg: 'success!' });
+
+    } catch(err) {
+        console.log(err);
+        next(err);
+    }
+};
+
+exports.deleteApplication = async(req, res, next) => {
+    const applicationId = req.params.id;
+
+    try {
+        const application = await Application.findByPk(applicationId);
+        if(!application) {
+            const error = new Error();
+            error.message = 'No Application Found';
+            error.statusCode = 422;
+            
+            throw(error);
+        }
+
+        application.destroy();
+    } catch(err) {
+        if(!err.statusCode) err.statusCode = 500;
+        next(err);
+        return err;
+    }
+
+    res.status(200).json({msg: 'success'});
+};
 
 // exports.getApplications = async (req, res, next) => {
 //     const index = req.query.index || 0;
@@ -208,6 +274,7 @@ exports.deleteApplicant = (req, res, next) => {
         where: { id: req.params.id },
         include: Person
     }).then(applicant => {
+        //@TODO: think this is wrong - throw the error, not next
         if(!applicant) {
             const error = new Error();
             error.message = 'No User Found';
