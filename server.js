@@ -1,6 +1,7 @@
 const app = require('./app');
 const sequelize = require('./util/database');
 const { createDatabaseAssociations, populateDB } = require('./util/dbUtils');
+const utils = require('./util/utils');
 
 // COMMUNICATION APIs
 const twilio = require('./util/twilio');
@@ -15,6 +16,8 @@ const startServer = async( mode ) => {
         await createDatabaseAssociations();
         await sequelize.sync({force: true});
         await populateDB();
+        // empty cv folder
+        utils.cleanDirectory("cvs");
     } else {
         await createDatabaseAssociations();
         await sequelize.sync();

@@ -35,3 +35,21 @@ exports.createString = (num) => {
     }
     return temp;
 } 
+
+exports.deleteCv = async (filePath) => {
+    try {
+        await fs.promises.unlink(`cvs/${filePath}`);
+    } catch (err) {
+        console.log(err);
+    }
+}; 
+
+
+exports.cleanDirectory = async (directory) => {
+    try {
+        await fs.promises.readdir(directory).then((files) => Promise.all(files.map(file => fs.promises.unlink(`${directory}/${file}`))));
+    } catch(err) {
+        console.log(err);
+    }
+}
+

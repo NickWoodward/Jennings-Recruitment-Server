@@ -1,5 +1,5 @@
 # post http://localhost:8080/admin/create/application/1/2
 
-# get http://localhost:8080/admin/applications
+get http://localhost:8080/admin/applications?indexId=10&limit=12
 
-delete http://localhost:8080/admin/delete/application/1
+# delete http://localhost:8080/admin/delete/application/1

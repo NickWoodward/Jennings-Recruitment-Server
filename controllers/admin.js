@@ -1,5 +1,5 @@
 const fs = require('fs');
-const util = require('util');
+const utils = require('../util/utils');
 const path = require('path');
 const Sequelize = require('sequelize');
 const sequelize = require('../util/database');
@@ -18,11 +18,13 @@ const Company = require('../models/company');
 
 
 exports.getApplications = async(req, res, next) => {
+    const findOne = req.query.indexId;
     const index = req.query.index || 0;
-    const limit = req.query.limit || 10;
+    let limit = req.query.limit || 10;
     const orderField = req.query.orderField || 'createdAt';
     const orderDirection = req.query.orderDirection || 'DESC';
     let order;
+    let topRow;
 
     switch(req.query.orderField) {
         case 'lastName': 
@@ -44,6 +46,44 @@ exports.getApplications = async(req, res, next) => {
     }
 
     try {
+        // Find a specific row to highlight if needed
+        if(findOne) {
+            topRow = await Application.findByPk(findOne, {
+                include: [
+                    {                               
+                        model: Job,
+                        include: [ 
+                            { 
+                                model: Company,
+                                attributes: [ 'id', 'name' ],
+                                include: [
+                                  {
+                                    model: Contact,
+                                    separate: true,
+                                    // attributes: [],
+                                    include: [{
+                                      model: Person,
+                                      attributes: [ 'firstName', 'lastName', 'phone', 'email' ]
+                                    }]
+                                  }
+                                ]
+                                
+                            } 
+                        ]
+                    },
+                    {
+                        model: Applicant,
+                        include: [ 
+                            {
+                                model: Person,
+                                attributes: [ 'id', 'firstName', 'lastName', 'email', 'phone', 'createdAt' ]
+                            } 
+                        ],
+                    }
+                ],
+            });
+        }
+
         const applications = await Application.findAndCountAll({
             include: [
                 {                               
@@ -99,7 +139,36 @@ exports.getApplications = async(req, res, next) => {
  
             ]
         });
-        
+        console.log('limit' + limit);
+        console.log(findOne);
+        // If there's a row to be highlighted
+        if(topRow) {
+            console.log('top row');
+            const visible = applications.rows.filter(application => application.id === topRow.id);
+            const index = applications.rows.findIndex(application => application.id === topRow.id);
+
+            // 1 too many results in the array
+            if(applications.rows.length + 1 > limit) {
+                console.log('too many for page');
+                // If the row appears in the array to be returned, remove it
+                if(visible) {
+                    console.log('visible');
+                    applications.rows.splice(index, 1);
+                } else {
+                    // Remove the last element instead
+                    applications.rows.pop();
+                }
+            } else { 
+                console.log('fits in page') 
+                if(visible) applications.rows.splice(index, 1);
+
+            }
+            
+            // Add the highlighted topRow to the array
+            applications.rows.unshift(topRow) 
+        }
+
+        applications.rows.forEach(row => console.log(row.id, row.applicant.person.firstName, row.job.title));
         res.status(200).json({msg: 'success', applications: applications});
 
     } catch (err) {
@@ -156,9 +225,12 @@ exports.createApplication = async(req, res, next) => {
 
 exports.deleteApplication = async(req, res, next) => {
     const applicationId = req.params.id;
+    let cvUrl;
 
     try {
-        const application = await Application.findByPk(applicationId);
+        const application = await Application.findByPk(applicationId, {
+            include: Applicant
+        });
         if(!application) {
             const error = new Error();
             error.message = 'No Application Found';
@@ -167,7 +239,13 @@ exports.deleteApplication = async(req, res, next) => {
             throw(error);
         }
 
-        application.destroy();
+        cvUrl = application.applicant.cvUrl;
+        
+        if(cvUrl) {
+            utils.deleteCv(cvUrl);
+        }
+
+        await application.destroy();
     } catch(err) {
         if(!err.statusCode) err.statusCode = 500;
         next(err);
@@ -270,6 +348,8 @@ exports.createApplicant = (req, res, next) => {
 };
 
 exports.deleteApplicant = (req, res, next) => {
+    let cvUrl;
+
     Applicant.findOne({
         where: { id: req.params.id },
         include: Person
@@ -281,6 +361,8 @@ exports.deleteApplicant = (req, res, next) => {
             error.statusCode = 404;
             next(error);
         }
+        cvUrl = applicant.cvUrl;
+        console.log(cvUrl);
         // Destroying the person cascades to the applicant and the applications
         return applicant.person.destroy();
     }).then(applicant => {
@@ -332,9 +414,7 @@ exports.editApplicant = (req, res, next) =>{
         });
 };
 
-const deleteCv = (filePath) => {
 
-}; 
 
 exports.getApplicants = (req, res, next) => {
 
@@ -401,7 +481,8 @@ exports.getApplicants = (req, res, next) => {
 };
 
 exports.getCv = (req, res, next) => {
-    Applicant.findOne({ where: { id: req.params.applicantId } })
+    console.log(req.params);
+    Applicant.findOne({ where: { personId: req.params.applicantId } })
         .then(applicant => {
             if(applicant && applicant.cvUrl) {
                 const cvName = applicant.cvUrl;
