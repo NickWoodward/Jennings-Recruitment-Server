@@ -139,40 +139,32 @@ exports.getApplications = async(req, res, next) => {
  
             ]
         });
-        console.log('limit' + limit);
-        console.log(findOne);
+
         // If there's a row to be highlighted
         if(topRow) {
-            console.log('top row');
             const visible = applications.rows.filter(application => application.id === topRow.id);
             const index = applications.rows.findIndex(application => application.id === topRow.id);
 
             // 1 too many results in the array
             if(applications.rows.length + 1 > limit) {
-                console.log('too many for page');
                 // If the row appears in the array to be returned, remove it
                 if(visible) {
-                    console.log('visible');
                     applications.rows.splice(index, 1);
                 } else {
                     // Remove the last element instead
                     applications.rows.pop();
                 }
             } else { 
-                console.log('fits in page') 
                 if(visible) applications.rows.splice(index, 1);
-
             }
             
             // Add the highlighted topRow to the array
             applications.rows.unshift(topRow) 
         }
 
-        applications.rows.forEach(row => console.log(row.id, row.applicant.person.firstName, row.job.title));
         res.status(200).json({msg: 'success', applications: applications});
 
     } catch (err) {
-        console.log('fuck');
         console.log(err);
     }
 
@@ -514,54 +506,112 @@ exports.getCv = (req, res, next) => {
    
 };
 
-exports.getJobs = (req, res, next) => {
+exports.getJobs = async (req, res, next) => {
+    const findOne = req.query.indexId;
     const index = req.query.index || 0;
     const limit = req.query.limit || 10;
     const orderField = req.query.orderField || 'createdAt';
-    const order = req.query.orderDirection || 'DESC';
+    const orderDirection = req.query.orderDirection || 'DESC';
+    let order;
+    let topRow;
+    console.log(findOne);
+    // Set the ordering
+    switch(req.query.orderField) {
+        // add other cases here (see getApplications)
+        // Check for unique order problems (see notes in that switch function)
+        default:
+            order = [ orderField, orderDirection ];
+    }
 
-    const findJobs = Job.findAndCountAll({
-        attributes: [
-            'id',
-            'title',
-            'wage',
-            'location',
-            'description',
-            'jobType',
-            'position',
-            'pqe',
-            'featured',
-            'createdAt',
-            [Sequelize.fn('date_format', Sequelize.col('job.createdAt'), '%d/%m/%y'), 'jobDate'],
-            'companyId'
-        ],
-        offset: parseInt(index),
-        limit: parseInt(limit, 10),
-        order: [ [orderField, order] ],
-        distinct: true,
-        include: [ 
-            {
-                model: Company,
-                attributes: ['name']
-            }, 
-            {
-                model: Applicant,
+    // Find a specific row to highlight if needed
+    try {
+
+        if(findOne) {
+            topRow = await Job.findByPk(findOne, {
                 attributes: [
-                    'id', 
-                    'cvUrl', 
-                    'personId',
-                    [Sequelize.fn('date_format', Sequelize.col('applicants.createdAt'), '%d/%m/%y'), 'createdAt'],
+                    'id',
+                    'title',
+                    'wage',
+                    'location',
+                    'description',
+                    'jobType',
+                    'position',
+                    'pqe',
+                    'featured',
+                    'createdAt',
+                    [Sequelize.fn('date_format', Sequelize.col('job.createdAt'), '%d/%m/%y'), 'jobDate'],
+                    'companyId'
                 ],
                 include: [ 
                     {
-                        model: Person,
-                        attributes: [ 'firstName', 'lastName', 'phone', 'email' ]
-                    } 
-                ] 
-            }
-        ]
-    })
-    .then(results => {
+                        model: Company,
+                        attributes: ['name']
+                    }, 
+                    {
+                        model: Applicant,
+                        attributes: [
+                            'id', 
+                            'cvUrl', 
+                            'personId',
+                            [Sequelize.fn('date_format', Sequelize.col('applicants.createdAt'), '%d/%m/%y'), 'createdAt'],
+                        ],
+                        include: [ 
+                            {
+                                model: Person,
+                                attributes: [ 'firstName', 'lastName', 'phone', 'email' ]
+                            } 
+                        ] 
+                    }
+                ]
+                
+            })
+            // Format to match the other jobs in the array (company object flattened)
+            topRow.dataValues.companyName = topRow.company.name;
+            delete topRow.dataValues.company;
+        }
+
+        const results = await Job.findAndCountAll({
+            attributes: [
+                'id',
+                'title',
+                'wage',
+                'location',
+                'description',
+                'jobType',
+                'position',
+                'pqe',
+                'featured',
+                'createdAt',
+                [Sequelize.fn('date_format', Sequelize.col('job.createdAt'), '%d/%m/%y'), 'jobDate'],
+                'companyId'
+            ],
+            offset: parseInt(index),
+            limit: parseInt(limit, 10),
+            order: [ [orderField, orderDirection] ],
+            distinct: true,
+            include: [ 
+                {
+                    model: Company,
+                    attributes: ['name']
+                }, 
+                {
+                    model: Applicant,
+                    attributes: [
+                        'id', 
+                        'cvUrl', 
+                        'personId',
+                        [Sequelize.fn('date_format', Sequelize.col('applicants.createdAt'), '%d/%m/%y'), 'createdAt'],
+                    ],
+                    include: [ 
+                        {
+                            model: Person,
+                            attributes: [ 'firstName', 'lastName', 'phone', 'email' ]
+                        } 
+                    ] 
+                }
+            ]
+        });
+
         results.rows = results.rows.map(({
             dataValues: {
                 id, title, wage, location, description, featured, jobDate, companyId, jobType, position, pqe,
@@ -590,19 +640,133 @@ exports.getJobs = (req, res, next) => {
                 companyId, 
                 companyName, 
                 applicants
-             };
+                };
         });
+        
+        // If there's a row to be highlighted
+        if(topRow) {
+            console.log('topRow!');
+            const visible = results.rows.filter(job => job.id === topRow.id);
+            const index = results.rows.findIndex(job => job.id === topRow.id);
+
+            // 1 too many results in the array
+            if(results.rows.length + 1 > limit) {
+                // If the row appears in the array to be returned, remove it
+                if(visible) {
+                    results.rows.splice(index, 1);
+                } else {
+                    // Remove the last element instead
+                    results.rows.pop();
+                }
+            } else { 
+                if(visible) results.rows.splice(index, 1);
+            }
+            
+            // Add the highlighted topRow to the array
+            results.rows.unshift(topRow) 
+        }
 
         res.status(200).json({ msg: 'Success', jobs: results.rows, total: results.count });
         return;
-    })
-    .catch(err => {
+
+    } catch(err) {
+        console.log(err);
         if(!err.statusCode) err.statusCode = 500;
         next(err);
         return err;
-    });
+    }
 
-    return findJobs;
+
+
+
+    // const index = req.query.index || 0;
+    // const limit = req.query.limit || 10;
+    // const orderField = req.query.orderField || 'createdAt';
+    // const order = req.query.orderDirection || 'DESC';
+
+    // const findJobs = Job.findAndCountAll({
+    //     attributes: [
+    //         'id',
+    //         'title',
+    //         'wage',
+    //         'location',
+    //         'description',
+    //         'jobType',
+    //         'position',
+    //         'pqe',
+    //         'featured',
+    //         'createdAt',
+    //         [Sequelize.fn('date_format', Sequelize.col('job.createdAt'), '%d/%m/%y'), 'jobDate'],
+    //         'companyId'
+    //     ],
+    //     offset: parseInt(index),
+    //     limit: parseInt(limit, 10),
+    //     order: [ [orderField, order] ],
+    //     distinct: true,
+    //     include: [ 
+    //         {
+    //             model: Company,
+    //             attributes: ['name']
+    //         }, 
+    //         {
+    //             model: Applicant,
+    //             attributes: [
+    //                 'id', 
+    //                 'cvUrl', 
+    //                 'personId',
+    //                 [Sequelize.fn('date_format', Sequelize.col('applicants.createdAt'), '%d/%m/%y'), 'createdAt'],
+    //             ],
+    //             include: [ 
+    //                 {
+    //                     model: Person,
+    //                     attributes: [ 'firstName', 'lastName', 'phone', 'email' ]
+    //                 } 
+    //             ] 
+    //         }
+    //     ]
+    // })
+    // .then(results => {
+    //     results.rows = results.rows.map(({
+    //         dataValues: {
+    //             id, title, wage, location, description, featured, jobDate, companyId, jobType, position, pqe,
+    //             company: { name: companyName },
+    //             applicants,
+    //         }
+    //     }) => {
+    //         applicants = applicants.map(({ id, cvUrl, createdAt: appliedDate, personId, person: { firstName, lastName, phone, email } }) => {
+    //             const cvType = cvUrl? cvUrl.slice(cvUrl.lastIndexOf('.')):null;
+    //             const cvName = cvUrl? cvUrl.slice(12): 'No CV uploaded';
+
+    //             return { id, personId, firstName, lastName, cvType, cvName, appliedDate, phone, email };
+    //         });
+            
+    //         return { 
+    //             id,
+    //             title, 
+    //             wage, 
+    //             location, 
+    //             description, 
+    //             featured, 
+    //             jobType,
+    //             position,
+    //             pqe,
+    //             jobDate,
+    //             companyId, 
+    //             companyName, 
+    //             applicants
+    //          };
+    //     });
+
+    //     res.status(200).json({ msg: 'Success', jobs: results.rows, total: results.count });
+    //     return;
+    // })
+    // .catch(err => {
+    //     if(!err.statusCode) err.statusCode = 500;
+    //     next(err);
+    //     return err;
+    // });
+
+    // return findJobs;
 
 };
 
@@ -838,6 +1002,7 @@ exports.getCompanies = (req, res, next) => {
         res.status(200).json({ companies: results.rows, total: results.count });
         return;
     }).catch(err => {
+        console.log(err);
         if(!err.statusCode) err.statusCode = 500; 
         next(err);
         return err;

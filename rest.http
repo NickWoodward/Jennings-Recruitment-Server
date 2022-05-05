@@ -1,5 +1,7 @@
 # post http://localhost:8080/admin/create/application/1/2
 
-get http://localhost:8080/admin/applications?indexId=10&limit=12
+# get http://localhost:8080/admin/applications?indexId=10&limit=12
+
+get http://localhost:8080/admin/jobs?indexId=2&limit=12
 
 # delete http://localhost:8080/admin/delete/application/1
