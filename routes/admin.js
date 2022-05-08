@@ -13,6 +13,7 @@ router.get('/applicants', adminController.getApplicants);
 router.get('/cvs/:applicantId', adminController.getCv);
 router.get('/jobs',adminController.getJobs);
 router.get('/companies', adminController.getCompanies);
+router.get('/companyNames', adminController.getCompanyNames);
 router.get('/company/:id', adminController.getCompany);
 router.get('/applications', adminController.getApplications);
 

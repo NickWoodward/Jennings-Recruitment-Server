@@ -514,7 +514,7 @@ exports.getJobs = async (req, res, next) => {
     const orderDirection = req.query.orderDirection || 'DESC';
     let order;
     let topRow;
-    console.log(findOne);
+
     // Set the ordering
     switch(req.query.orderField) {
         // add other cases here (see getApplications)
@@ -953,60 +953,112 @@ exports.deleteJob = (req, res, next) => {
         });
 };
 
-exports.getCompanies = (req, res, next) => {
-    const index = req.query.index || 0;
-    const orderField = req.query.orderField || 'createdAt';
-    const order = req.query.orderDirection || 'DESC';
+exports.getCompanyNames = async (req, res, next) => {
+    try {
+        const results = await Company.findAll({ attributes: ['id','name'] });
 
-    const constraints = {
-        offset: parseInt(index),
-        order: [[ orderField, order ]]
-    };
-
-    if(req.query.limit) constraints.limit = parseInt(req.query.limit);
-
-    // findAndCountAll returns Promise<{ count: number, rows: Model[] }>
-    return Company.findAndCountAll({
-        attributes: [ 
-            'id', 
-            'name',
-            'createdAt',
-            [Sequelize.fn('date_format', Sequelize.col('company.createdAt' ), '%d/%m/%y'), 'companyDate'],
-        ],
-        // group: ['name'],
-        ...constraints,
-        distinct: true,
-        include: [
-            { model: Job }, 
-            { model: Address },
-            { model: Person }
-        ]
-    }).then(results => {
-        results.rows = results.rows.map((
-            { 
-                dataValues: { id, name, companyDate, addresses, people }
-        }) => { 
-            people = people.map(({ firstName, lastName, id: personId, email, phone, contact: { position, id: contactId } }) =>  { 
-                return { personId, firstName, lastName, email, phone, position, contactId };
-            });
-        
-            addresses = addresses.map(( { 
-                dataValues: { id: addressId, firstLine, secondLine, city, county, postcode }
-            }) => { 
-                return { addressId, firstLine, secondLine, city, county, postcode }
-            });
-
-            return { id, name, companyDate, addresses, people }; 
-        });
-
-        res.status(200).json({ companies: results.rows, total: results.count });
-        return;
-    }).catch(err => {
+        res.status(200).json({ msg: 'Success', companyNames: results });
+    } catch(err) {
+        if(!err.statusCode) err.statusCode = 500;
         console.log(err);
-        if(!err.statusCode) err.statusCode = 500; 
         next(err);
         return err;
-    });
+    }
+};
+
+exports.getCompanies = async (req, res, next) => {
+    const findOne = req.query.indexId;
+    const index = req.query.index || 0;
+    const limit = req.query.limit || 0;
+    const orderField = req.query.orderField || 'createdAt';
+    const orderDirection = req.query.orderDirection || 'DESC';
+    let order;
+    let topRow;
+
+    // Set the ordering
+    switch(req.query.orderField) {
+        // add other cases here (see getApplications)
+        // Check for unique order problems (see notes in that switch function)
+        default:
+            order = [ orderField, orderDirection ];
+    }
+
+    // Find a specific row to highlight if needed
+    try {
+        topRow = await Company.findByPk(findOne, {
+            include: [
+                {
+                    model: Address
+                },
+                {
+                    model: Job,
+                },
+                
+            ]
+        });
+
+        console.log(topRow);
+
+    } catch(err) {
+        console.log(err);
+        if(!err.statusCode) err.statusCode = 500;
+        next(err);
+        return err;
+    }
+
+    // const index = req.query.index || 0;
+    // const orderField = req.query.orderField || 'createdAt';
+    // const order = req.query.orderDirection || 'DESC';
+
+    // const constraints = {
+    //     offset: parseInt(index),
+    //     order: [[ orderField, order ]]
+    // };
+
+    // if(req.query.limit) constraints.limit = parseInt(req.query.limit);
+
+    // // findAndCountAll returns Promise<{ count: number, rows: Model[] }>
+    // return Company.findAndCountAll({
+    //     attributes: [ 
+    //         'id', 
+    //         'name',
+    //         'createdAt',
+    //         [Sequelize.fn('date_format', Sequelize.col('company.createdAt' ), '%d/%m/%y'), 'companyDate'],
+    //     ],
+    //     // group: ['name'],
+    //     ...constraints,
+    //     distinct: true,
+    //     include: [
+    //         { model: Job }, 
+    //         { model: Address },
+    //         { model: Person }
+    //     ]
+    // }).then(results => {
+    //     results.rows = results.rows.map((
+    //         { 
+    //             dataValues: { id, name, companyDate, addresses, people }
+    //     }) => { 
+    //         people = people.map(({ firstName, lastName, id: personId, email, phone, contact: { position, id: contactId } }) =>  { 
+    //             return { personId, firstName, lastName, email, phone, position, contactId };
+    //         });
+        
+    //         addresses = addresses.map(( { 
+    //             dataValues: { id: addressId, firstLine, secondLine, city, county, postcode }
+    //         }) => { 
+    //             return { addressId, firstLine, secondLine, city, county, postcode }
+    //         });
+
+    //         return { id, name, companyDate, addresses, people }; 
+    //     });
+
+    //     res.status(200).json({ companies: results.rows, total: results.count });
+    //     return;
+    // }).catch(err => {
+    //     console.log(err);
+    //     if(!err.statusCode) err.statusCode = 500; 
+    //     next(err);
+    //     return err;
+    // });
 };
 
 exports.getCompany = (req, res, next) => {
