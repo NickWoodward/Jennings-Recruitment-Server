@@ -12,6 +12,7 @@ const Person = require('../models/person');
 router.get('/applicants', adminController.getApplicants);
 router.get('/cvs/:applicantId', adminController.getCv);
 router.get('/jobs',adminController.getJobs);
+router.get('/jobnames', adminController.getJobNames);
 router.get('/companies', adminController.getCompanies);
 router.get('/companyNames', adminController.getCompanyNames);
 router.get('/company/:id', adminController.getCompany);
@@ -179,6 +180,9 @@ adminController.editCompany);
 // @TODO: Update validation
 router.post('/create/job', multer().none(),
     [ 
+        body('companyId')
+            .isFloat({ gt: 0 })
+            .withMessage('Must be a number'),
         body('title')
             .isString()
             .isLength({ min: 3, max: 50 })
@@ -196,7 +200,7 @@ router.post('/create/job', multer().none(),
             .withMessage('Enter a location between 3 and 50 characters')
             .trim()
             .escape(),
-        body('jobType')
+        body('type')
             .isString()
             .withMessage('Please enter alphanumeric characters')
             .isLength({ min: 2, max: 50})
@@ -211,12 +215,8 @@ router.post('/create/job', multer().none(),
             .trim()
             .escape(),
         body('pqe')
-            .isString()
-            .withMessage('Please enter alphanumeric characters')
-            .isLength({ min: 1, max: 50})
-            .withMessage('PQE must be between 2 and 50 characters')
-            .trim()
-            .escape(),
+            .isFloat({ gt: 0, lt: 11 })
+            .withMessage('Enter a number between 1 and 10'),
         body('description')
             .isLength({ min: 5, max: 500 })
             .withMessage('Enter a description between 5 and 500 characters')

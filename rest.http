@@ -2,6 +2,30 @@
 
 # get http://localhost:8080/admin/applications?indexId=10&limit=12
 
-get http://localhost:8080/admin/jobs?indexId=2&limit=12
+# get http://localhost:8080/admin/jobs?indexId=3&limit=12
 
 # delete http://localhost:8080/admin/delete/application/1
+
+# get http://localhost:8080/admin/companies?indexId=2
+
+# get http://localhost:8080/admin/companyNames
+
+POST http://localhost:8080/admin/create/job
+content-type: application/json
+
+{
+    "companyId": 3,
+    "title": "Head of Cars",
+    "wage": 40000,
+    "location": "Reading",
+    "jobType": "Interim",
+    "position": "In House",
+    "pqe": 2,
+    "featured": 0,
+    "description": "This is a description"
+
+}
+
+###
+
+GET http://localhost:8080/admin/jobnames

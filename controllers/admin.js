@@ -508,12 +508,13 @@ exports.getCv = (req, res, next) => {
 
 exports.getJobs = async (req, res, next) => {
     const findOne = req.query.indexId;
-    const index = req.query.index || 0;
-    const limit = req.query.limit || 10;
+    const index = req.query.index;
+    let limit = req.query.limit;
     const orderField = req.query.orderField || 'createdAt';
     const orderDirection = req.query.orderDirection || 'DESC';
     let order;
     let topRow;
+    console.log('\nHA\n', req.query.limit);
 
     // Set the ordering
     switch(req.query.orderField) {
@@ -570,7 +571,7 @@ exports.getJobs = async (req, res, next) => {
             delete topRow.dataValues.company;
         }
 
-        const results = await Job.findAndCountAll({
+        const options = {
             attributes: [
                 'id',
                 'title',
@@ -585,8 +586,6 @@ exports.getJobs = async (req, res, next) => {
                 [Sequelize.fn('date_format', Sequelize.col('job.createdAt'), '%d/%m/%y'), 'jobDate'],
                 'companyId'
             ],
-            offset: parseInt(index),
-            limit: parseInt(limit, 10),
             order: [ [orderField, orderDirection] ],
             distinct: true,
             include: [ 
@@ -610,7 +609,13 @@ exports.getJobs = async (req, res, next) => {
                     ] 
                 }
             ]
-        });
+        };
+
+        if(req.query.limit) options.limit = parseInt(limit, 10);
+        if(req.query.offset) options.offset = parseInt(index);
+
+
+        const results = await Job.findAndCountAll(options);
 
         results.rows = results.rows.map(({
             dataValues: {
@@ -770,6 +775,21 @@ exports.getJobs = async (req, res, next) => {
 
 };
 
+exports.getJobNames = async(req, res, next) => {
+    try {
+        const names = await Job.findAll({
+            attributes: ['id', 'title']
+        });
+        res.status(200).json({ names: names });
+        
+    } catch(err) {
+        console.log(err);
+        if(!err.statusCode) err.statusCode = 500;
+        next(err);
+        return;
+    }
+};
+
 exports.editJob = async (req, res, next) => {
 
 
@@ -871,7 +891,6 @@ exports.createJob = (req, res, next) => {
         error.statusCode = 422;
         throw error;
     }
-    console.log('success');
 
     // Check to see if a related company exists
     const job = Company.findByPk(req.body.companyId).then(result => {
@@ -885,7 +904,7 @@ exports.createJob = (req, res, next) => {
             title: req.body.title,
             wage: req.body.wage,
             location: req.body.location,
-            jobType: req.body.jobType,
+            jobType: req.body.type,
             position: req.body.position,
             pqe: parseInt(req.body.pqe),
             description: req.body.description,
@@ -898,6 +917,7 @@ exports.createJob = (req, res, next) => {
             error.statusCode = 422;
             throw error;
         }
+
         res.status(201).json({ message: 'Job created', job: job });
         return;
     }).catch(err => {
