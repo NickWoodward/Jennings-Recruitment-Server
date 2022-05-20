@@ -161,14 +161,16 @@ exports.getApplications = async(req, res, next) => {
             // Add the highlighted topRow to the array
             applications.rows.unshift(topRow) 
         }
-
         res.status(200).json({msg: 'success', applications: applications});
 
     } catch (err) {
+        if(!err.statusCode) err.statusCode = 500;
+        next(err);
         console.log(err);
     }
 
 };
+
 
 exports.createApplication = async(req, res, next) => {
     const jobId = req.params.jobId;
@@ -472,6 +474,31 @@ exports.getApplicants = (req, res, next) => {
 
 };
 
+exports.getApplicantNames = async (req, res, next) => {
+    try {
+        let applicants = await Applicant.findAll({
+            attributes: ['id'],
+            include: [
+                {
+                    model:Person,
+                    attributes: ['firstName', 'lastName']
+                }
+            ],
+        });
+
+        applicants = applicants.map(({ id, person: { firstName, lastName } }) => {
+            return { applicantId: id, firstName, lastName }
+        });
+
+        res.status(200).json({ applicants });
+    } catch(err) {
+        console.log(err);
+        if(!err.statusCode) err.statusCode = 500;
+        next(err);
+        return;
+    }
+};
+
 exports.getCv = (req, res, next) => {
     console.log(req.params);
     Applicant.findOne({ where: { personId: req.params.applicantId } })
@@ -514,7 +541,6 @@ exports.getJobs = async (req, res, next) => {
     const orderDirection = req.query.orderDirection || 'DESC';
     let order;
     let topRow;
-    console.log('\nHA\n', req.query.limit);
 
     // Set the ordering
     switch(req.query.orderField) {
@@ -612,8 +638,7 @@ exports.getJobs = async (req, res, next) => {
         };
 
         if(req.query.limit) options.limit = parseInt(limit, 10);
-        if(req.query.offset) options.offset = parseInt(index);
-
+        if(req.query.index) options.offset = parseInt(index);
 
         const results = await Job.findAndCountAll(options);
 
@@ -777,9 +802,16 @@ exports.getJobs = async (req, res, next) => {
 
 exports.getJobNames = async(req, res, next) => {
     try {
-        const names = await Job.findAll({
-            attributes: ['id', 'title']
+        let names = await Job.findAll({
+            attributes: ['id', 'title'],
+            include: [
+                {
+                    model: Company,
+                    attributes: ['name']
+                }
+            ]
         });
+        names = names.map(({ id, title, company: { name } }) => { return { id, title, companyName: name } });
         res.status(200).json({ names: names });
         
     } catch(err) {
@@ -791,8 +823,6 @@ exports.getJobNames = async(req, res, next) => {
 };
 
 exports.editJob = async (req, res, next) => {
-
-
     try {
         const errors = validationResult(req);
 
@@ -806,6 +836,20 @@ exports.editJob = async (req, res, next) => {
     
         const job = await Job.findOne({
             where: { id: req.params.id },
+            attributes: [
+                'id',
+                'title',
+                'wage',
+                'location',
+                'description',
+                'jobType',
+                'position',
+                'pqe',
+                'featured',
+                'createdAt',
+                [Sequelize.fn('date_format', Sequelize.col('job.createdAt'), '%d/%m/%y'), 'jobDate'],
+                'companyId'
+            ],
             include: Company 
         });
 
@@ -821,10 +865,13 @@ exports.editJob = async (req, res, next) => {
         job.description = req.body.description;
         job.featured = req.body.featured;
         job.companyId = req.body.companyId;
-        job.jobType = req.body.jobType;
+        job.jobType = req.body.type;
         job.position = req.body.position;
         job.pqe = parseInt(req.body.pqe);
 
+        // Format to match the other jobs in the array (company object flattened)
+        job.dataValues.companyName = job.company.name;
+        delete job.dataValues.company;
 
         await job.save();
 
@@ -967,6 +1014,7 @@ exports.deleteJob = (req, res, next) => {
             res.status(200).json({message: 'Job deleted'});
             return;
         }).catch(err => {
+            console.log(err);
             if(!err.statusCode) err.statusCode = 500;
             next(err);
             return err;

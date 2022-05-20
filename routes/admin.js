@@ -10,6 +10,7 @@ const adminController = require('../controllers/admin');
 const Person = require('../models/person');
 
 router.get('/applicants', adminController.getApplicants);
+router.get('/applicantnames', adminController.getApplicantNames);
 router.get('/cvs/:applicantId', adminController.getCv);
 router.get('/jobs',adminController.getJobs);
 router.get('/jobnames', adminController.getJobNames);
@@ -46,7 +47,7 @@ router.post('/edit/job/:id', multer().none(),
         .escape()
         .isLength({ min: 3, max: 50 })
         .withMessage('Enter a location between 3 and 50 characters'),
-    body('jobType')
+    body('type')
         .isString()
         .withMessage('Please enter alphanumeric characters')
         .isLength({ min: 2, max: 50})
