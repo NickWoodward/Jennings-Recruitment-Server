@@ -823,6 +823,7 @@ exports.getJobNames = async(req, res, next) => {
 };
 
 exports.editJob = async (req, res, next) => {
+    console.log(req.body);
     try {
         const errors = validationResult(req);
 
@@ -870,7 +871,7 @@ exports.editJob = async (req, res, next) => {
         job.pqe = parseInt(req.body.pqe);
 
         // Format to match the other jobs in the array (company object flattened)
-        job.dataValues.companyName = job.company.name;
+        job.dataValues.companyName = req.body.companyName? req.body.companyName : job.company.name;
         delete job.dataValues.company;
 
         await job.save();
@@ -946,6 +947,7 @@ exports.createJob = (req, res, next) => {
             error.statusCode = 404;
             throw error;
         }
+
         return Job.create({
             companyId: req.body.companyId,
             title: req.body.title,
@@ -964,6 +966,9 @@ exports.createJob = (req, res, next) => {
             error.statusCode = 422;
             throw error;
         }
+        // Format to match the other jobs in the array (company object flattened)
+        job.dataValues.companyName = req.body.companyName? req.body.companyName : job.company.name;
+        delete job.dataValues.company;
 
         res.status(201).json({ message: 'Job created', job: job });
         return;
@@ -1051,8 +1056,8 @@ exports.getCompanies = async (req, res, next) => {
             order = [ orderField, orderDirection ];
     }
 
-    // Find a specific row to highlight if needed
     try {
+        // Find a specific row to highlight if needed
         topRow = await Company.findByPk(findOne, {
             include: [
                 {
@@ -1061,11 +1066,91 @@ exports.getCompanies = async (req, res, next) => {
                 {
                     model: Job,
                 },
-                
-            ]
+                {
+                    model: Person
+                }
+            ],
+            attributes: [ 
+                'id', 
+                'name',
+                'createdAt',
+                [Sequelize.fn('date_format', Sequelize.col('company.createdAt' ), '%d/%m/%y'), 'companyDate'],
+            ],
         });
 
-        console.log(topRow);
+        const options = {
+            include: [
+                {
+                    model: Address
+                },
+                {
+                    model: Job,
+                },
+                {
+                    model: Contact,
+                    include: Person
+                }
+            ],
+            attributes: [ 
+                'id', 
+                'name',
+                'createdAt',
+                [Sequelize.fn('date_format', Sequelize.col('company.createdAt' ), '%d/%m/%y'), 'companyDate'],
+            ],
+            order: [[ orderField, orderDirection ]],
+            distinct: true
+        }
+
+        if(req.query.limit) options.limit = parseInt(limit, 10);
+        if(req.query.index) options.offset = parseInt(index);
+
+        const results = await Company.findAndCountAll(options);
+        results.rows = results.rows.map(({
+            dataValues: { id, companyName, createdAt: companyDate, addresses, jobs, contacts }
+        }) => {
+
+            addresses = addresses.map(({ dataValues: { id, firstLine, secondLine, city, postcode }}) => {
+                return { id, firstLine, secondLine, city, postcode }
+            });
+            jobs = jobs.map(({ dataValues: { id: jobId, title, wage, location, description, featured, jobType, position, pqe, createdAt: jobDate }}) => {
+                return {  jobId, title, wage, location, description, featured, jobType, position, pqe, jobDate }
+            });
+            contacts = contacts.map(({ dataValues: { position, person: { dataValues: { id: personId, firstName, lastName, phone, email } } }}) => {
+                return { personId, position, firstName, lastName, phone, email }
+            });
+
+            return { 
+                id, 
+                companyDate,
+                companyName, 
+                addresses,
+                jobs,
+                contacts
+            }
+        });
+      
+        // If there's a row to be highlighted
+        if(topRow) {
+            const visible = results.rows.filter(company => company.id === topRow.id);
+            const index = results.rows.findIndex(company => company.id === topRow.id);
+
+            // 1 too many results in the array
+            if(results.rows.length + 1 > limit) {
+                // If the row appears in the array to be returned, remove it
+                if(visible) {
+                    results.rows.splice(index, 1);
+                } else {
+                    // Remove the last element instead
+                    results.rows.pop();
+                }
+            } else { 
+                if(visible) results.rows.splice(index, 1);
+            }
+            
+            // Add the highlighted topRow to the array
+            results.rows.unshift(topRow) 
+        }
+        res.status(200).json({ companies: results.rows, companyTotal: results.count });
 
     } catch(err) {
         console.log(err);

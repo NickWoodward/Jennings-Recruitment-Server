@@ -43,8 +43,8 @@ exports.createDatabaseAssociations = () => {
     Company.hasMany(Contact);
     Contact.belongsTo(Person);
     
-    // Person.hasMany(Contact)
-    // Contact.belongsTo(Company);
+    Person.hasMany(Contact)
+    Contact.belongsTo(Company);
     // ****
 }
 

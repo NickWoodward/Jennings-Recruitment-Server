@@ -35,6 +35,13 @@ router.post('/edit/job/:id', multer().none(),
         .isString()
         .isLength({ min: 3, max: 50 })
         .withMessage('Enter a title between 3 and 50 characters'),
+    body('companyName')
+        .optional({ checkFalsy: true })
+        .trim()
+        .escape()
+        .isString()
+        .isLength({ min: 2, max: 50 })
+        .withMessage('Company Name must be between 2 and 50 characters'),
     body('wage')
         .trim()
         .escape()
@@ -82,6 +89,9 @@ adminController.editJob);
 // @TODO: add param validation
 router.post('/edit/company/:id/:contactId/:addressId', multer().none(), 
 [
+    param('id')
+        .isFloat({ gt: 0 })
+        .withMessage('Must be a number'),
     body('companyName')
         .isString()
         .withMessage('Invalid characters, please use letters and numbers only')
@@ -184,6 +194,13 @@ router.post('/create/job', multer().none(),
         body('companyId')
             .isFloat({ gt: 0 })
             .withMessage('Must be a number'),
+        body('companyName')
+            .optional({ checkFalsy: true })
+            .trim()
+            .escape()
+            .isString()
+            .isLength({ min: 2, max: 50 })
+            .withMessage('Company Name must be between 2 and 50 characters'),
         body('title')
             .isString()
             .isLength({ min: 3, max: 50 })
