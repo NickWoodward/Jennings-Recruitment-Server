@@ -1084,7 +1084,7 @@ exports.getCompanies = async (req, res, next) => {
                     model: Address
                 },
                 {
-                    model: Job,
+                    model: Job
                 },
                 {
                     model: Contact,
@@ -1106,7 +1106,7 @@ exports.getCompanies = async (req, res, next) => {
 
         const results = await Company.findAndCountAll(options);
         results.rows = results.rows.map(({
-            dataValues: { id, companyName, createdAt: companyDate, addresses, jobs, contacts }
+            dataValues: { id, name: companyName, companyDate, addresses, jobs, contacts }
         }) => {
 
             addresses = addresses.map(({ dataValues: { id, firstLine, secondLine, city, postcode }}) => {
