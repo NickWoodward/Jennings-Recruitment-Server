@@ -1065,6 +1065,20 @@ exports.getCompanies = async (req, res, next) => {
                 },
                 {
                     model: Job,
+                    attributes: [
+                        'id',
+                        'title',
+                        'wage',
+                        'location',
+                        'description',
+                        'featured',
+                        'jobType',
+                        'position',
+                        'pqe',
+                        'createdAt',
+                        [Sequelize.fn('date_format', Sequelize.col('jobs.createdAt' ), '%d/%m/%y'), 'jobDate'],
+
+                    ]
                 },
                 {
                     model: Person
@@ -1084,7 +1098,21 @@ exports.getCompanies = async (req, res, next) => {
                     model: Address
                 },
                 {
-                    model: Job
+                    model: Job,
+                    attributes: [
+                        'id',
+                        'title',
+                        'wage',
+                        'location',
+                        'description',
+                        'featured',
+                        'jobType',
+                        'position',
+                        'pqe',
+                        'createdAt',
+                        [Sequelize.fn('date_format', Sequelize.col('jobs.createdAt' ), '%d/%m/%y'), 'jobDate'],
+
+                    ]
                 },
                 {
                     model: Contact,
@@ -1112,7 +1140,7 @@ exports.getCompanies = async (req, res, next) => {
             addresses = addresses.map(({ dataValues: { id, firstLine, secondLine, city, postcode }}) => {
                 return { id, firstLine, secondLine, city, postcode }
             });
-            jobs = jobs.map(({ dataValues: { id: jobId, title, wage, location, description, featured, jobType, position, pqe, createdAt: jobDate }}) => {
+            jobs = jobs.map(({ dataValues: { id: jobId, title, wage, location, description, featured, jobType, position, pqe, jobDate }}) => {
                 return {  jobId, title, wage, location, description, featured, jobType, position, pqe, jobDate }
             });
             contacts = contacts.map(({ dataValues: { position, person: { dataValues: { id: personId, firstName, lastName, phone, email } } }}) => {
