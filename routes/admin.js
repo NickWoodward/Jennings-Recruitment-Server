@@ -8,6 +8,7 @@ const { body, param } = require('express-validator');
 
 const adminController = require('../controllers/admin');
 const Person = require('../models/person');
+const Contact = require('../models/contact');
 
 router.get('/applicants', adminController.getApplicants);
 router.get('/applicantnames', adminController.getApplicantNames);
@@ -277,23 +278,30 @@ router.post('/create/company', multer().none(), [
         .escape(),
     body('phone')
         .isString()
-        .withMessage('Invalid characters, please use letters and numbers only')
-        .isLength({ min: 9, max: 12 })
-        .withMessage('Must be between 9 and 12 characters')
-        .custom(value => {
-            const start = value.substring(0,2);
-            if(
-                start != '07' &&
-                start != '01' && 
-                start != '02' &&
-                start != '03' &&
-                start != '08'
-            ) throw new Error('Please enter a valid UK phone number');
-            
-            return true;
-        })
         .trim()
-        .escape(),
+        .replace(/\s*/g,"")
+        .matches(/^0([1-6][0-9]{8,10}|7[0-9]{9})$/)
+        .withMessage('Please enter a UK phone number'),
+
+    // body('phone')
+    //     .isString()
+    //     .withMessage('Invalid characters, please use letters and numbers only')
+    //     .isLength({ min: 9, max: 12 })
+    //     .withMessage('Must be between 9 and 12 characters')
+    //     .custom(value => {
+    //         const start = value.substring(0,2);
+    //         if(
+    //             start != '07' &&
+    //             start != '01' && 
+    //             start != '02' &&
+    //             start != '03' &&
+    //             start != '08'
+    //         ) throw new Error('Please enter a valid UK phone number');
+            
+    //         return true;
+    //     })
+    //     .trim()
+    //     .escape(),
     body('email')
         .isString()
         .withMessage('Invalid characters, please use letters and numbers only')
@@ -305,7 +313,11 @@ router.post('/create/company', multer().none(), [
         .custom(async value => {
             try{
                 const person = await Person.findOne({ where: { email: value } });
-                if(person) return Promise.reject('Email already exists'); 
+                let contact;
+                if(person) {
+                    contact = await Contact.findOne({ where: { personId: person.id } });
+                }
+                if(contact) return Promise.reject('Already a contact email address'); 
 
             } catch(err) {
                 throw err;

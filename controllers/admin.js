@@ -1056,41 +1056,62 @@ exports.getCompanies = async (req, res, next) => {
             order = [ orderField, orderDirection ];
     }
 
+    // @TODO: check toprow ordering
     try {
         // Find a specific row to highlight if needed
-        topRow = await Company.findByPk(findOne, {
-            include: [
-                {
-                    model: Address
-                },
-                {
-                    model: Job,
-                    attributes: [
-                        'id',
-                        'title',
-                        'wage',
-                        'location',
-                        'description',
-                        'featured',
-                        'jobType',
-                        'position',
-                        'pqe',
-                        'createdAt',
-                        [Sequelize.fn('date_format', Sequelize.col('jobs.createdAt' ), '%d/%m/%y'), 'jobDate'],
+        if(findOne) {
+            topRow = await Company.findByPk(findOne, {
+                include: [
+                    {
+                        model: Address
+                    },
+                    {
+                        model: Job,
+                        attributes: [
+                            'id',
+                            'title',
+                            'wage',
+                            'location',
+                            'description',
+                            'featured',
+                            'jobType',
+                            'position',
+                            'pqe',
+                            'createdAt',
+                            [Sequelize.fn('date_format', Sequelize.col('jobs.createdAt' ), '%d/%m/%y'), 'jobDate'],
+                        ]
+                    },
+                    {
+                        model: Contact,
+                        include: Person
+                    }
+                ],
+                attributes: [ 
+                    'id', 
+                    'name',
+                    'createdAt',
+                    [Sequelize.fn('date_format', Sequelize.col('company.createdAt' ), '%d/%m/%y'), 'companyDate'],
+                ],
+            });
 
-                    ]
-                },
-                {
-                    model: Person
-                }
-            ],
-            attributes: [ 
-                'id', 
-                'name',
-                'createdAt',
-                [Sequelize.fn('date_format', Sequelize.col('company.createdAt' ), '%d/%m/%y'), 'companyDate'],
-            ],
-        });
+            // Format toprow to match the other array elements
+            let { id, companyDate, name: companyName, addresses, jobs, contacts } = topRow.dataValues;
+            jobs = jobs.map(({ dataValues: { id: jobId, title, wage, location, description, featured, jobType, position, pqe, jobDate }}) => {
+                return {  jobId, title, wage, location, description, featured, jobType, position, pqe, jobDate }
+            });
+            contacts = contacts.map(({ dataValues: { position, person: { dataValues: { id: personId, firstName, lastName, phone, email } } }}) => {
+                return { personId, position, firstName, lastName, phone, email }
+            });
+
+            topRow = { 
+                id, 
+                companyDate,
+                companyName, 
+                addresses,
+                jobs,
+                contacts
+            }
+        };
 
         const options = {
             include: [
@@ -1125,7 +1146,7 @@ exports.getCompanies = async (req, res, next) => {
                 'createdAt',
                 [Sequelize.fn('date_format', Sequelize.col('company.createdAt' ), '%d/%m/%y'), 'companyDate'],
             ],
-            order: [[ orderField, orderDirection ]],
+            order: [ [orderField, orderDirection] ],
             distinct: true
         }
 
@@ -1284,17 +1305,33 @@ exports.createCompany = async(req, res, next) => {
 
             if(!company) { const err = new Error('Error creating Company'); throw err; }
 
-            // Returns Promise<Model>
-            const person = await Person.create({ 
-                firstName: req.body.firstName,
-                lastName: req.body.lastName,
-                phone: req.body.phone,
-                email: req.body.email
-            }, { transaction: t });
+            let person;
+
+            // If the person exists as an applicant, use them
+            const applicant = await Person.findOne({where: { email: req.body.email }}, { transaction: t });
+
+            if(!applicant) {
+                person = await Person.create({ 
+                    firstName: req.body.firstName,
+                    lastName: req.body.lastName,
+                    phone: req.body.phone,
+                    email: req.body.email
+                }, { transaction: t });
+            } else {
+                person = applicant;
+            }
 
             if(!person) { const err = new Error('Error creating Person'); throw err; }
 
-            // Returns Promise<Model>
+            const contact = await Contact.create({
+                position: req.body.position,
+            }, { transaction: t });
+
+            if(!contact) { const err = new Error('Error creating Contact'); throw err; }
+
+            await contact.setPerson(person, { transaction: t });
+            await company.setContacts(contact, { transaction: t })
+
             const address = await Address.create({
                 firstLine: req.body.firstLine,
                 secondLine: req.body.secondLine,
@@ -1305,7 +1342,6 @@ exports.createCompany = async(req, res, next) => {
 
             if(!address) { const err = new Error('Error creating Address'); throw err; }
 
-            await company.addPeople(person, { through: { position: req.body.position }, transaction: t});
             await company.addAddresses(address, { transaction: t });
 
             res.status(201).json({ msg: 'Success', company: company });
@@ -1316,6 +1352,8 @@ exports.createCompany = async(req, res, next) => {
       // Transaction committed successfully
       // `result` is whatever was returned from the transaction callback
     } catch (err) {
+        console.log(err);
+
         // Transaction rolled back automatically by Sequelize
         if(!err.statusCode) {
             err.statusCode = 500;

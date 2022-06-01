@@ -6,7 +6,7 @@
 
 # delete http://localhost:8080/admin/delete/application/1
 
-# get http://localhost:8080/admin/companies?indexId=2
+get http://localhost:8080/admin/companies?indexId=2
 
 # get http://localhost:8080/admin/companyNames
 
@@ -24,6 +24,25 @@ content-type: application/json
     "featured": 0,
     "description": "This is a description"
 
+}
+
+###
+
+POST http://localhost:8080/admin/create/company
+content-type: application/json
+
+{
+    "companyName": "Test",
+    "firstName": "Nick",
+    "lastName": "Woodward",
+    "position": "CEO",
+    "phone": "074843312767",
+    "email": "nickwoodward@hotmail.com",
+    "firstLine": "4 Meadow Road",
+    "secondLine": "test",
+    "city": "Reading",
+    "county": "Berks",
+    "postcode": "RG77WA"
 }
 
 ###
