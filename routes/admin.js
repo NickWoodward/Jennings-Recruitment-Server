@@ -363,6 +363,58 @@ router.post('/create/company', multer().none(), [
 ],
 adminController.createCompany);
 
+router.post('/create/contact', multer().none(), [
+    body('firstName')
+        .isString()
+        .withMessage('Invalid characters, please use letters and numbers only')
+        .isLength({ min: 2, max: 50 })
+        .withMessage('Enter a first name between 2 and 50 characters')
+        .trim()
+        .escape(),
+    body('lastName')
+        .isString()
+        .withMessage('Invalid characters, please use letters and numbers only')
+        .isLength({ min: 2, max: 50 })
+        .withMessage('Enter a last name between 2 and 50 characters')
+        .trim()
+        .escape(),
+    body('position')
+        .isString()
+        .withMessage('Invalid characters, please use letters and numbers only')
+        .isLength({  min: 2, max: 50 })
+        .withMessage('Enter a last name between 2 and 50 characters')
+        .trim()
+        .escape(),
+    body('phone')
+        .isString()
+        .trim()
+        .replace(/\s*/g,"")
+        .matches(/^0([1-6][0-9]{8,10}|7[0-9]{9})$/)
+        .withMessage('Please enter a UK phone number'),
+    body('email')
+        .isString()
+        .withMessage('Invalid characters, please use letters and numbers only')
+        .isLength({ min: 4, max: 50 })
+        .withMessage('Please enter an email between 4 and 50 characters')
+        .isEmail()
+        .withMessage('Please enter a valid email address')
+        .normalizeEmail({ all_lowercase: true })
+        .custom(async value => {
+            try{
+                const person = await Person.findOne({ where: { email: value } });
+                let contact;
+                if(person) {
+                    contact = await Contact.findOne({ where: { personId: person.id } });
+                }
+                if(contact) return Promise.reject('Already a contact email address'); 
+
+            } catch(err) {
+                throw err;
+            }
+        })
+        .trim(),
+], adminController.createContact);
+
 router.delete('/delete/applicant/:id', adminController.deleteApplicant);
 router.delete('/delete/application/:id', adminController.deleteApplication);
 router.delete('/delete/job/:id', adminController.deleteJob);

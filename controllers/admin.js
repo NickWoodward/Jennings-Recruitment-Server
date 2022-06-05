@@ -1362,6 +1362,65 @@ exports.createCompany = async(req, res, next) => {
         return err;
     }
 };
+
+exports.createContact = async (req, res, next) => {
+
+    try {
+        const errors = validationResult(req);
+        if(!errors.isEmpty()) {
+            const error = new Error('Validation Error');
+            error.validationErrors = errors.array({ onlyFirstError: true });
+            error.statusCode = 422;
+            throw error;
+        }
+    
+        const companyId = req.body.id;
+
+        await sequelize.transaction(async(t) => {
+            const company = await Company.findByPk(companyId, { transaction: t });
+            let person;
+
+            if(!company) {
+                const error = new Error('Company Not Found');
+                error.statusCode = 422;
+                throw error;
+            }
+    
+            // If the person exists as an applicant, use them
+            const applicant = await Person.findOne({where: { email: req.body.email }}, { transaction: t });
+    
+            if(!applicant) {
+                person = await Person.create({ 
+                    firstName: req.body.firstName,
+                    lastName: req.body.lastName,
+                    phone: req.body.phone,
+                    email: req.body.email
+                }, { transaction: t });
+            } else {
+                person = applicant;
+            }
+    
+            if(!person) { const err = new Error('Error creating Person'); throw err; }
+    
+            const contact = await Contact.create({
+                position: req.body.position,
+            }, { transaction: t });
+    
+            if(!contact) { const err = new Error('Error creating Contact'); throw err; }
+    
+            await contact.setPerson(person, { transaction: t });
+            await company.addContact(contact, { transaction: t });
+
+            res.status(201).json({ msg: 'Contact created' });
+        })
+ 
+    } catch(err) {
+        console.log(err);
+        if(!err.statusCode) err.statusCode = 500;
+        next(err);
+        return err;
+    }
+}
     
 exports.deleteCompany =  (req, res, next) => {
     let company;

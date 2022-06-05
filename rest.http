@@ -36,13 +36,27 @@ content-type: application/json
     "firstName": "Nick",
     "lastName": "Woodward",
     "position": "CEO",
-    "phone": "074843312767",
+    "phone": "07484312767",
     "email": "nickwoodward@hotmail.com",
     "firstLine": "4 Meadow Road",
     "secondLine": "test",
     "city": "Reading",
     "county": "Berks",
     "postcode": "RG77WA"
+}
+
+###
+
+POST http://localhost:8080/admin/create/contact
+content-type: application/json
+
+{
+    "companyId": "1",
+    "firstName": "Nick",
+    "lastName": "Woodward",
+    "position": "CEO",
+    "phone": "07484312767",
+    "email": "nickwoodward@hotmail.com"
 }
 
 ###

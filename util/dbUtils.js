@@ -135,18 +135,18 @@ exports.populateDB = async() => {
 
     const contact4 = await Contact.create({position: 'Head of Gin'});
     await contact4.setPerson(person7);
-    await company4.setContacts(contact4);
+    await company4.addContact(contact4);
 
     const person8 = await Person.create({ firstName: 'Alex', lastName: 'May', phone: '0736463748', email: 'maylord@gmail.com' });
     const person9 = await Person.create({ firstName: 'John', lastName: 'Gantlett', phone: '0736463748', email: 'ganty@gmail.com' });
 
     const contact5 = await Contact.create({ position: 'Head of HR' });
     await contact5.setPerson(person8);
-    await company4.setContacts(contact5);
+    await company4.addContact(contact5);
 
     const contact6 = await Contact.create({ position: 'HR' });
     await contact6.setPerson(person9);
-    await company4.setContacts(contact6);
+    await company4.addContact(contact6);
 
     // await person8.addCompany(company4, { through: { position: 'Head of HR' } });
     // await person9.addCompany(company4, { through: { position: 'HR' } });
