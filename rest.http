@@ -61,4 +61,37 @@ content-type: application/json
 
 ###
 
+POST http://localhost:8080/admin/create/address
+content-type: application/json
+
+{
+    "id":"1",
+    "firstLine":"4 Meadow Road",
+    "secondLine":"Rushall",
+    "city": "Pewsey",
+    "county": "Wiltshire",
+    "postcode": "RG6 8EU"
+}
+
+###
+
+POST http://localhost:8080/admin/edit/company
+content-type: application/json
+
+{
+    "id": "4",
+    "contactId":"4",
+    "companyName": "Test",
+    "firstName": "Phil",
+    "lastName": "Woodward",
+    "position": "CEO",
+    "phone": "07484312767",
+    "email": "nickwoodward@hotmail.com",
+    "firstLine": "4 Meadow Road",
+    "secondLine": "test",
+    "city": "Reading",
+    "county": "Berks",
+    "postcode": "RG77WA"
+}
+###
 GET http://localhost:8080/admin/jobnames

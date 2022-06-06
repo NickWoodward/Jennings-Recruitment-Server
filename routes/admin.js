@@ -4,7 +4,7 @@ const router = express.Router();
 const { uploadFile } = require('../middleware/multer');
 const multer = require('multer');
 const { body, param } = require('express-validator');
-
+const { Op } = require("sequelize");
 
 const adminController = require('../controllers/admin');
 const Person = require('../models/person');
@@ -88,9 +88,9 @@ router.post('/edit/job/:id', multer().none(),
 adminController.editJob);
 
 // @TODO: add param validation
-router.post('/edit/company/:id/:contactId/:addressId', multer().none(), 
+router.post('/edit/company', multer().none(), 
 [
-    param('id')
+    body('id')
         .isFloat({ gt: 0 })
         .withMessage('Must be a number'),
     body('companyName')
@@ -121,25 +121,11 @@ router.post('/edit/company/:id/:contactId/:addressId', multer().none(),
         .withMessage('Enter a last name between 2 and 50 characters')
         .trim()
         .escape(),
-    body('phone')
+        body("phone")
         .isString()
-        .withMessage('Invalid characters, please use letters and numbers only')
-        .isLength({ min: 9, max: 12 })
-        .withMessage('Must be between 9 and 12 characters')
-        .custom(value => {
-            const start = value.substring(0,2);
-            if(
-                start != '07' &&
-                start != '01' && 
-                start != '02' &&
-                start != '03' &&
-                start != '08'
-            ) throw new Error('Please enter a valid UK phone number');
-            
-            return true;
-        })
-        .trim()
-        .escape(),
+        .custom(value => value.replace(/\s*/g, "")
+                                .match(/^0([1-6][0-9]{8,10}|7[0-9]{9})$/))
+        .withMessage("Please enter a UK phone number"),
     body('email')
         .isString()
         .withMessage('Invalid characters, please use letters and numbers only')
@@ -148,6 +134,20 @@ router.post('/edit/company/:id/:contactId/:addressId', multer().none(),
         .isEmail()
         .withMessage('Please enter a valid email address')
         .normalizeEmail({ all_lowercase: true })
+        .custom(async (value, {req}) => {
+            try{
+                const person = await Person.findOne({ where: { email: value } });
+                let contact;
+                if(person) {
+                    // if the contact 
+                    contact = await Contact.findOne({ where: { personId: person.id, companyId: {[Op.not]:req.body.id }} });
+                }
+                if(contact) return Promise.reject('Already a contact email address'); 
+
+            } catch(err) {
+                throw err;
+            }
+        })
         .trim(),
     body('firstLine')
         .isString()
@@ -184,7 +184,8 @@ router.post('/edit/company/:id/:contactId/:addressId', multer().none(),
         .isLength({ min: 5, max: 8 })        
         .withMessage('Please enter a postcode between 5 and 8 characters')
         .trim()
-        .escape()
+        .escape(),
+
 ], 
 adminController.editCompany);
 
@@ -276,32 +277,11 @@ router.post('/create/company', multer().none(), [
         .withMessage('Enter a last name between 2 and 50 characters')
         .trim()
         .escape(),
-    body('phone')
+        body("phone")
         .isString()
-        .trim()
-        .replace(/\s*/g,"")
-        .matches(/^0([1-6][0-9]{8,10}|7[0-9]{9})$/)
-        .withMessage('Please enter a UK phone number'),
-
-    // body('phone')
-    //     .isString()
-    //     .withMessage('Invalid characters, please use letters and numbers only')
-    //     .isLength({ min: 9, max: 12 })
-    //     .withMessage('Must be between 9 and 12 characters')
-    //     .custom(value => {
-    //         const start = value.substring(0,2);
-    //         if(
-    //             start != '07' &&
-    //             start != '01' && 
-    //             start != '02' &&
-    //             start != '03' &&
-    //             start != '08'
-    //         ) throw new Error('Please enter a valid UK phone number');
-            
-    //         return true;
-    //     })
-    //     .trim()
-    //     .escape(),
+        .custom(value => value.replace(/\s*/g, "")
+                                .match(/^0([1-6][0-9]{8,10}|7[0-9]{9})$/))
+        .withMessage("Please enter a UK phone number"),
     body('email')
         .isString()
         .withMessage('Invalid characters, please use letters and numbers only')
@@ -385,12 +365,11 @@ router.post('/create/contact', multer().none(), [
         .withMessage('Enter a last name between 2 and 50 characters')
         .trim()
         .escape(),
-    body('phone')
+    body("phone")
         .isString()
-        .trim()
-        .replace(/\s*/g,"")
-        .matches(/^0([1-6][0-9]{8,10}|7[0-9]{9})$/)
-        .withMessage('Please enter a UK phone number'),
+        .custom(value => value.replace(/\s*/g, "")
+                                .match(/^0([1-6][0-9]{8,10}|7[0-9]{9})$/))
+        .withMessage("Please enter a UK phone number"),
     body('email')
         .isString()
         .withMessage('Invalid characters, please use letters and numbers only')
@@ -414,6 +393,46 @@ router.post('/create/contact', multer().none(), [
         })
         .trim(),
 ], adminController.createContact);
+
+router.post('/create/address', multer().none(), [
+    body('firstLine')
+        .isString()
+        .withMessage('Invalid characters, please use letters and numbers only')
+        .isLength({ min: 1, max: 50 })
+        .withMessage('Please enter a value between 1 and 50 characters')
+        .trim()
+        .escape(),
+    body('secondLine')
+        .optional({ checkFalsy: true })
+        .isString()
+        .withMessage('Invalid characters, please use letters and numbers only')
+        .isLength({ min: 2, max: 50 })        
+        .withMessage('Please enter a value between 2 and 50 characters')
+        .trim()
+        .escape(),
+    body('city')
+        .isString()
+        .withMessage('Invalid characters, please use letters and numbers only')
+        .isLength({ min: 3, max: 60 })
+        .withMessage('Please enter a value between 3 and 60 characters')
+        .trim()
+        .escape(),
+    body('county')
+        .isString()
+        .withMessage('Invalid characters, please use letters and numbers only')
+        .isLength({ min: 2, max: 50 })        
+        .withMessage('Please enter a county between 2 and 50 characters')
+        .trim()
+        .escape(),
+    body('postcode')
+        .isString()
+        .withMessage('Invalid characters, please use letters and numbers only')
+        .isLength({ min: 5, max: 8 })        
+        .withMessage('Please enter a postcode between 5 and 8 characters')
+        .trim()
+        .escape(),
+
+], adminController.createAddress);
 
 router.delete('/delete/applicant/:id', adminController.deleteApplicant);
 router.delete('/delete/application/:id', adminController.deleteApplication);
