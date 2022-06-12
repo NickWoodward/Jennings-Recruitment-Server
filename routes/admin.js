@@ -91,6 +91,12 @@ adminController.editJob);
 router.post('/edit/company', multer().none(), 
 [
     body('id')
+        .isFloat({ gt: 0, lt: 90000000 })
+        .withMessage('Must be a number'),
+    body('id')
+        .isFloat({ gt: 0, lt: 90000000 })
+        .withMessage('Must be a number'),
+    body('id')
         .isFloat({ gt: 0 })
         .withMessage('Must be a number'),
     body('companyName')
@@ -188,6 +194,107 @@ router.post('/edit/company', multer().none(),
 
 ], 
 adminController.editCompany);
+
+router.post('/edit/contact', multer().none(), [
+    body('id').isFloat(),
+    body('firstName')
+        .isString()
+        .withMessage('Invalid characters, please use letters and numbers only')
+        .isLength({ min: 2, max: 50 })
+        .withMessage('Enter a first name between 2 and 50 characters')
+        .trim()
+        .escape(),
+    body('lastName')
+        .isString()
+        .withMessage('Invalid characters, please use letters and numbers only')
+        .isLength({ min: 2, max: 50 })
+        .withMessage('Enter a last name between 2 and 50 characters')
+        .trim()
+        .escape(),
+    body('position')
+        .isString()
+        .withMessage('Invalid characters, please use letters and numbers only')
+        .isLength({  min: 2, max: 50 })
+        .withMessage('Enter a last name between 2 and 50 characters')
+        .trim()
+        .escape(),
+        body("phone")
+        .isString()
+        .custom(value => value.replace(/\s*/g, "")
+                                .match(/^0([1-6][0-9]{8,10}|7[0-9]{9})$/))
+        .withMessage("Please enter a UK phone number"),
+    body('email')
+        .isString()
+        .withMessage('Invalid characters, please use letters and numbers only')
+        .isLength({ min: 4, max: 50 })
+        .withMessage('Please enter an email between 4 and 50 characters')
+        .isEmail()
+        .withMessage('Please enter a valid email address')
+        .normalizeEmail({ all_lowercase: true })
+        .custom(async (value, {req}) => {
+            try{
+                const person = await Person.findOne({ where: { email: req.body.email } });
+                console.log('person',!!person)
+
+                // 1: If no one has that email address, OK
+                if(!person) return Promise.resolve();
+
+                // 2: If the person is the contact in question, OK
+                let contact = await Contact.findOne({ where: { id: req.body.contactId }});
+                if(contact.personId === person.id) return Promise.resolve();
+
+                // 3: Else reject the request
+                return Promise.reject('Already a contact email address');
+
+            } catch(err) {
+                console.log(err);
+                throw err;
+            }
+        })
+        .trim()
+], adminController.editContact);
+
+router.post('/edit/address', multer().none(), [
+    body('id').isFloat(),
+    body('addressId').isFloat(),
+    body('firstLine')
+        .isString()
+        .withMessage('Invalid characters, please use letters and numbers only')
+        .isLength({ min: 1, max: 50 })
+        .withMessage('Please enter a value between 1 and 50 characters')
+        .trim()
+        .escape(),
+    body('secondLine')
+        .optional({ checkFalsy: true })
+        .isString()
+        .withMessage('Invalid characters, please use letters and numbers only')
+        .isLength({ min: 2, max: 50 })        
+        .withMessage('Please enter a value between 2 and 50 characters')
+        .trim()
+        .escape(),
+    body('city')
+        .isString()
+        .withMessage('Invalid characters, please use letters and numbers only')
+        .isLength({ min: 3, max: 60 })
+        .withMessage('Please enter a value between 3 and 60 characters')
+        .trim()
+        .escape(),
+    body('county')
+        .isString()
+        .withMessage('Invalid characters, please use letters and numbers only')
+        .isLength({ min: 2, max: 50 })        
+        .withMessage('Please enter a county between 2 and 50 characters')
+        .trim()
+        .escape(),
+    body('postcode')
+        .isString()
+        .withMessage('Invalid characters, please use letters and numbers only')
+        .isLength({ min: 5, max: 8 })        
+        .withMessage('Please enter a postcode between 5 and 8 characters')
+        .trim()
+        .escape(),
+],
+adminController.editAddress);
 
 
 // @TODO: Update validation

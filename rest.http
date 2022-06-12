@@ -7,6 +7,7 @@
 # delete http://localhost:8080/admin/delete/application/1
 
 get http://localhost:8080/admin/companies?indexId=2
+###
 
 # get http://localhost:8080/admin/companyNames
 
@@ -28,6 +29,7 @@ content-type: application/json
 
 ###
 
+###
 POST http://localhost:8080/admin/create/company
 content-type: application/json
 
@@ -80,7 +82,8 @@ content-type: application/json
 
 {
     "id": "4",
-    "contactId":"4",
+    "contactId":"6",
+    "addressId":"3",
     "companyName": "Test",
     "firstName": "Phil",
     "lastName": "Woodward",
@@ -94,4 +97,34 @@ content-type: application/json
     "postcode": "RG77WA"
 }
 ###
+
+POST http://localhost:8080/admin/edit/contact
+content-type: application/json
+
+{
+    "id": "4",
+    "contactId":"5",
+    "firstName": "Jon",
+    "lastName": "Woodward",
+    "position": "CEO",
+    "phone": "07484312767",
+    "email": "nickwoodward@gmai.com"
+}
+###
+
+POST http://localhost:8080/admin/edit/address
+content-type: application/json
+
+{
+    "id":"1",
+    "addressId":"1",
+    "firstLine": "4 Meadow Road",
+    "secondLine": "test",
+    "city": "Reading",
+    "county": "Berks",
+    "postcode": "RG77WA"
+}
+
+###
+
 GET http://localhost:8080/admin/jobnames

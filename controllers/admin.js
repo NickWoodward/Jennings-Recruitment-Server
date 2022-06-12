@@ -12,6 +12,7 @@ const Contact = require('../models/contact');
 const Person = require('../models/person');
 const Job = require('../models/job');
 const Company = require('../models/company');
+const e = require('express');
 
 // View magic methods 
 // console.log(Object.keys(obj.__proto__));
@@ -1154,12 +1155,15 @@ exports.getCompanies = async (req, res, next) => {
         if(req.query.index) options.offset = parseInt(index);
 
         const results = await Company.findAndCountAll(options);
+
+        // console.log(results);
+
         results.rows = results.rows.map(({
             dataValues: { id, name: companyName, companyDate, addresses, jobs, contacts }
         }) => {
 
-            addresses = addresses.map(({ dataValues: { id, firstLine, secondLine, city, postcode }}) => {
-                return { id, firstLine, secondLine, city, postcode }
+            addresses = addresses.map(({ dataValues: { id, firstLine, secondLine, city, county, postcode }}) => {
+                return { id, firstLine, secondLine, city, county, postcode }
             });
             jobs = jobs.map(({ dataValues: { id: jobId, title, wage, location, description, featured, jobType, position, pqe, jobDate }}) => {
                 return {  jobId, title, wage, location, description, featured, jobType, position, pqe, jobDate }
@@ -1297,18 +1301,16 @@ exports.createCompany = async(req, res, next) => {
             throw error;
         }
 
-        // Wrap db functions in transaction callback, passing t to each call option object
         await sequelize.transaction(async (t) => {
 
-            // Returns Promise<Model>
-            const company = await Company.create({ name: req.body.companyName }, { transaction: t });
+            let company = await Company.create({ name: req.body.companyName }, { transaction: t });
 
             if(!company) { const err = new Error('Error creating Company'); throw err; }
 
-            let person;
 
             // If the person exists as an applicant, use them
             const applicant = await Person.findOne({where: { email: req.body.email }}, { transaction: t });
+            let person;
 
             if(!applicant) {
                 person = await Person.create({ 
@@ -1330,7 +1332,8 @@ exports.createCompany = async(req, res, next) => {
             if(!contact) { const err = new Error('Error creating Contact'); throw err; }
 
             await contact.setPerson(person, { transaction: t });
-            await company.setContacts(contact, { transaction: t })
+            await company.addContact(contact, { transaction: t })
+
 
             const address = await Address.create({
                 firstLine: req.body.firstLine,
@@ -1344,17 +1347,70 @@ exports.createCompany = async(req, res, next) => {
 
             await company.addAddresses(address, { transaction: t });
 
-            res.status(201).json({ msg: 'Success', company: company });
+            company = await Company.findByPk(company.id, {
+                include: [
+                    {
+                        model: Address
+                    },
+                    {
+                        model: Job,
+                        attributes: [
+                            'id',
+                            'title',
+                            'wage',
+                            'location',
+                            'description',
+                            'featured',
+                            'jobType',
+                            'position',
+                            'pqe',
+                            'createdAt',
+                            [Sequelize.fn('date_format', Sequelize.col('jobs.createdAt' ), '%d/%m/%y'), 'jobDate'],
+                        ]
+                    },
+                    {
+                        model: Contact,
+                        include: Person
+                    }
+                ],
+                attributes: [ 
+                    'id', 
+                    'name',
+                    'createdAt',
+                    [Sequelize.fn('date_format', Sequelize.col('company.createdAt' ), '%d/%m/%y'), 'companyDate'],
+                ],
+                transaction:t
+            });
+            
+            
+            // Format toprow to match the other array elements
+            let { id, companyDate, name: companyName, addresses, jobs, contacts } = company.dataValues;
+            jobs = jobs.map(({ dataValues: { id: jobId, title, wage, location, description, featured, jobType, position, pqe, jobDate }}) => {
+                return {  jobId, title, wage, location, description, featured, jobType, position, pqe, jobDate }
+            });
+            contacts = contacts.map(({ dataValues: { id:contactId, position, person: { dataValues: { id: personId, firstName, lastName, phone, email } } }}) => {
+                return { contactId, personId, position, firstName, lastName, phone, email }
+            });
+
+            const formattedCompany = { 
+                id, 
+                companyDate,
+                companyName, 
+                addresses,
+                jobs,
+                contacts
+            }
+            console.log("🚀 ------------------------------------------------------------------------------------------------🚀")
+            console.log("🚀 ~ file: admin.js ~ line 1414 ~ awaitsequelize.transaction ~ formattedCompany", formattedCompany)
+            console.log("🚀 ------------------------------------------------------------------------------------------------🚀")
+            res.status(201).json({ msg: 'Success', company: formattedCompany });
         
             return;
         });
     
-      // Transaction committed successfully
-      // `result` is whatever was returned from the transaction callback
     } catch (err) {
         console.log(err);
 
-        // Transaction rolled back automatically by Sequelize
         if(!err.statusCode) {
             err.statusCode = 500;
         }
@@ -1584,27 +1640,42 @@ exports.editCompany = async (req, res, next) => {
         }
 
         const companyId = req.body.id;
-        const contactId = req.body.contactId;
-        const addressId = req.body.addressId;
 
         await sequelize.transaction(async(t) => {
             const company = await Company.findByPk(companyId, {
+                // The attributes/models included match the getCompanies query
                 include: [
-                    { 
-                        model: Address,
+                    {
+                        model: Address
+                    },
+                    {
+                        model: Job,
                         attributes: [
                             'id',
-                            'firstLine',
-                            'secondLine',
-                            'city',
-
+                            'title',
+                            'wage',
+                            'location',
+                            'description',
+                            'featured',
+                            'jobType',
+                            'position',
+                            'pqe',
+                            'createdAt',
+                            [Sequelize.fn('date_format', Sequelize.col('jobs.createdAt' ), '%d/%m/%y'), 'jobDate'],
                         ]
                     },
-                    { 
-                        model: Contact, 
+                    {
+                        model: Contact,
                         include: Person
                     }
-                ]
+                ],
+                attributes: [ 
+                    'id', 
+                    'name',
+                    'createdAt',
+                    [Sequelize.fn('date_format', Sequelize.col('company.createdAt' ), '%d/%m/%y'), 'companyDate'],
+                ],
+ 
             }, {transaction: t});
 
             if(!company) {
@@ -1613,12 +1684,15 @@ exports.editCompany = async (req, res, next) => {
                 throw error;
             }
 
+            // This will only add the values to the UPDATE object if they're present
+            // The current frontend sends all the values, including those not changed, but SEQUELIZE UPDATE ignores them
+            // Have kept this structure in case the front end changes
             const companyValues = {};
             const contactValues = {};
             const personValues = {};
             const addressValues = {};
 
-            if(req.body.companyName) companyValues.companyName = req.body.companyName;
+            if(req.body.companyName) companyValues.name = req.body.companyName;
 
             if(req.body.position) contactValues.position = req.body.position;
 
@@ -1635,8 +1709,9 @@ exports.editCompany = async (req, res, next) => {
 
             // Find the contact 
             const contact = company.contacts.find(contact => contact.id === parseInt(req.body.contactId));
-            console.log(company.contacts[0].id, req.body.contactId);
+    
             const person = contact.person;
+            
             if(!contact || !person) {
                 const error = new Error('Contact Not Found');
                 error.statusCode = 422;
@@ -1654,75 +1729,29 @@ exports.editCompany = async (req, res, next) => {
                 throw error;
             }
             await address.update(addressValues);
-
             await company.update(companyValues);
 
-            res.status(201).json({ msg: "Company Edited", company });
+            // Format the company to match the getCompanies query results
+
+            let { id, companyDate, name: companyName, addresses, jobs, contacts } = company.dataValues;
+            jobs = jobs.map(({ dataValues: { id: jobId, title, wage, location, description, featured, jobType, position, pqe, jobDate }}) => {
+                return {  jobId, title, wage, location, description, featured, jobType, position, pqe, jobDate }
+            });
+            contacts = contacts.map(({ dataValues: { id:contactId, position, person: { dataValues: { id: personId, firstName, lastName, phone, email } } }}) => {
+                return { contactId, personId, position, firstName, lastName, phone, email }
+            });
+
+            const formattedCompany = { 
+                id, 
+                companyDate,
+                companyName, 
+                addresses,
+                jobs,
+                contacts
+            }
+
+            res.status(201).json({ msg: "Company Edited", company:formattedCompany });
         });
-
-        // await sequelize.transaction(async(t) => {
-        //     const company = await Company.findByPk(req.params.id, {
-        //         include: [
-        //             { model: Address },
-        //             { model: Person },
-        //         ]
-        //     });
-
-        //     if(!company) {
-        //         const err = new Error('Company not found');
-        //         err.statusCode = 422;
-        //         throw err;
-        //     }
-
-        //     // Check if there's an array of people
-        //     if(company.people.length === 0 || !company.people ) throw new Error('Error editing Company1');
-
-        //     // Check if a valid contact ID has been provided
-        //     const person = company.people.find(person => person.id === parseInt(req.params.contactId));
-        //     console.log(company.people[0].id, req.params.contactId);
-
-        //     if(!person) {
-        //         const error = new Error('Error editing Company2');
-        //         error.statusCode = 422;
-        //         throw error;
-        //     }
-
-        //     // Check if there's an array of addresses
-        //     if(company.addresses.length === 0 || !company.addresses) throw new Error('Error editing Company3');
-
-        //     // Check if a valid address ID has been provided
-        //     const address = company.addresses.find(address => address.id === parseInt(req.params.addressId))
-        //     if(!address) {
-        //         const error = new Error('Error editing Company4');
-        //         error.statusCode = 422;
-        //         throw error;
-        //     }
-
-        //     const personIndex = company.people.indexOf(person);
-        //     const addressIndex = company.addresses.indexOf(address);
-
-        //     company.name = req.body.companyName;
-        //     company.people[personIndex].firstName = req.body.firstName;
-        //     company.people[personIndex].lastName = req.body.lastName;
-        //     company.people[personIndex].contact.position = req.body.position;
-        //     company.people[personIndex].phone = req.body.phone;
-   
-        //     if((req.body.email !== company.people[personIndex].email)) company.people[personIndex].email = req.body.email;
-        //     company.addresses[addressIndex].firstLine = req.body.firstLine;
-        //     company.addresses[addressIndex].secondLine = req.body.secondLine;
-        //     company.addresses[addressIndex].city = req.body.city;
-        //     company.addresses[addressIndex].county = req.body.county;
-        //     company.addresses[addressIndex].postcode = req.body.postcode;
-
-        //     await company.save();
-        //     await company.people[personIndex].save();
-        //     await company.people[personIndex].contact.save();
-        //     await company.addresses[addressIndex].save();
-
-        //     res.status(200).json({ msg: 'Company successfully updated', company });
-        // });
-
-        // return;
     } catch(err) {
         console.log(err);
         if(!err.statusCode) err.statusCode = 500;
@@ -1731,3 +1760,113 @@ exports.editCompany = async (req, res, next) => {
     }
 
 };  
+
+exports.editContact = async(req, res, next) => {
+    console.log('editContact');
+    try {
+        const errors = validationResult(req);
+        if(!errors.isEmpty()) {
+            const error = new Error('Validation Error');
+            error.validationErrors = errors.array({ onlyFirstError: true });
+            error.statusCode = 422;
+            throw error;
+        }
+
+        await sequelize.transaction(async t => {
+            const company = await Company.findByPk(req.body.id, {
+                include: [
+                    {
+                        model: Contact,
+                        include: Person
+                    }
+                ],
+               
+            }, {transaction: t});
+
+            if(!company) { const error = new Error('No Company Found'); error.statusCode = 422; throw error }
+
+            // Find the contact 
+            const contact = company.contacts.find(contact => contact.id === parseInt(req.body.contactId));
+           
+            if(!contact) { const error = new Error('No Contact Found'); error.statusCode = 422; throw error }
+
+            const person = contact.person;
+            if(!person) { const error = new Error('No Person Found'); error.statusCode = 422; throw error }
+   
+            const contactValues = {};
+            const personValues = {};
+
+            if(req.body.position) contactValues.position = req.body.position;
+            if(req.body.firstName) personValues.firstName = req.body.firstName;
+            if(req.body.lastName) personValues.lastName = req.body.lastName;
+            if(req.body.phone) personValues.phone = req.body.phone;
+            if(req.body.email) personValues.email = req.body.email;
+
+            await person.update(personValues);
+            await contact.update(contactValues);
+
+            // Map to the structure returned by every other company route
+            const formattedContacts = company.dataValues.contacts.map(({ dataValues: { id:contactId, position, person: { dataValues: { id: personId, firstName, lastName, phone, email } } }}) => {
+                return { contactId, personId, position, firstName, lastName, phone, email }
+            });
+
+            res.status(201).json({msg:'Contact Edited', contacts: formattedContacts});
+        });
+
+    } catch(err) {
+        console.log(err);
+        if(!err.statusCode) err.statusCode = 500;
+        next(err);
+        return err;
+    }
+}
+
+exports.editAddress = async(req, res, next) => {
+    try {
+        const errors = validationResult(req);
+        
+        if(!errors.isEmpty()) {
+            const error = new Error('Validation Error');
+            error.validationErrors = errors.array({ onlyFirstError: true });
+            error.statusCode = 422;
+            throw error;
+        }
+
+        const companyId = req.body.id;
+
+        await sequelize.transaction(async (t) => {
+            const company = await Company.findByPk(companyId, {
+                include: [
+                    {
+                        model: Address
+                    }
+                ]
+            }, {transaction: t});
+
+            if(!company) { const error = new Error('No Company Found'); error.statusCode = 422; throw error }
+
+            const address = company.addresses.find(address => address.id === parseInt(req.body.addressId));
+            if(!address) { const error = new Error('No Address Found'); error.statusCode = 422; throw error }
+
+            const addressValues = {};
+
+            if(req.body.firstLine) addressValues.firstLine = req.body.firstLine;
+            if(req.body.secondLine) addressValues.secondLine = req.body.secondLine;
+            if(req.body.city) addressValues.city = req.body.city;
+            if(req.body.county) addressValues.county = req.body.county;
+            if(req.body.postcode) addressValues.postcode = req.body.postcode;
+
+            await address.update(addressValues, {transaction: t});
+
+            console.log(company.addresses);
+            // Return all addresses
+            res.status(201).json({msg: 'Address Edited', addresses: company.addresses});
+        });
+
+    } catch(err) {
+        console.log(err);
+        if(!err.statusCode) err.statusCode = 500;
+        next(err);
+        return err;
+    }
+};
