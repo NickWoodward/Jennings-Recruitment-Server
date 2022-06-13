@@ -4,9 +4,10 @@
 
 # get http://localhost:8080/admin/jobs?indexId=3&limit=12
 
-# delete http://localhost:8080/admin/delete/application/1
+delete http://localhost:8080/admin/delete/application/1
+###
 
-get http://localhost:8080/admin/companies?indexId=2
+get http://localhost:8080/admin/companies?indexId=4
 ###
 
 # get http://localhost:8080/admin/companyNames
@@ -116,8 +117,8 @@ POST http://localhost:8080/admin/edit/address
 content-type: application/json
 
 {
-    "id":"1",
-    "addressId":"1",
+    "id":"2",
+    "addressId":"4",
     "firstLine": "4 Meadow Road",
     "secondLine": "test",
     "city": "Reading",
@@ -126,5 +127,7 @@ content-type: application/json
 }
 
 ###
+
+DELETE http://localhost:8080/admin/delete/company/4
 
 GET http://localhost:8080/admin/jobnames

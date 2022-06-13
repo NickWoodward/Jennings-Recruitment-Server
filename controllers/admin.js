@@ -1156,8 +1156,6 @@ exports.getCompanies = async (req, res, next) => {
 
         const results = await Company.findAndCountAll(options);
 
-        // console.log(results);
-
         results.rows = results.rows.map(({
             dataValues: { id, name: companyName, companyDate, addresses, jobs, contacts }
         }) => {
@@ -1182,22 +1180,40 @@ exports.getCompanies = async (req, res, next) => {
             }
         });
       
+
+        // console.dir(results.rows[1], {depth:2});
+
         // If there's a row to be highlighted
         if(topRow) {
-            const visible = results.rows.filter(company => company.id === topRow.id);
+            const visible = results.rows.filter(company => company.id === topRow.id)[0];
             const index = results.rows.findIndex(company => company.id === topRow.id);
-
             // 1 too many results in the array
             if(results.rows.length + 1 > limit) {
                 // If the row appears in the array to be returned, remove it
                 if(visible) {
+                    console.log('VISIBLE + LIMIT REACHED => SPLICE:  ', {visible});
+                    console.log(index);
                     results.rows.splice(index, 1);
+
                 } else {
+                    console.log('NOT VISIBLE + LIMIT REACHED => POP', {visible});
+                    console.log(index);
+
                     // Remove the last element instead
                     results.rows.pop();
                 }
             } else { 
-                if(visible) results.rows.splice(index, 1);
+                if(visible) {
+                    console.log('VISIBLE + LIMIT NOT REACHED REACHED',{visible});
+                    console.log(index);
+
+                    results.rows.splice(index, 1);
+                } else {
+                    console.log('NOT VISIBLE + LIMIT NOT REACHED', {visible});
+                    console.log(index);
+
+                }
+
             }
             
             // Add the highlighted topRow to the array
@@ -1205,6 +1221,7 @@ exports.getCompanies = async (req, res, next) => {
         }
         res.status(200).json({ companies: results.rows, companyTotal: results.count });
 
+        return;
     } catch(err) {
         console.log(err);
         if(!err.statusCode) err.statusCode = 500;
@@ -1538,92 +1555,111 @@ exports.createAddress = async(req, res, next) => {
     }
 }
     
-exports.deleteCompany =  (req, res, next) => {
-    let company;
+exports.deleteCompany = async(req, res, next) => {
+    const companyId = req.params.id;
+    console.log(companyId);
+    try {
+        await sequelize.transaction(async t => {
+            await Company.destroy({ where: { id: companyId } })
+        });
 
-    return sequelize.transaction(function(t) {
-        return (
-            Company
-                .findByPk(req.params.id, { transaction: t })
-                .then(result => {
-                    if(!result) {
-                        const error = new Error('Cannot find Company');
-                        error.statusCode = 422;
-                        throw error;
-                    }
-                    company = result;
-                    // Returns Promise<[Person]>
-                    return company.getPeople({transaction: t});
-                })
-                .then(people => {
-                    if(people.length < 1) {
-                        const error = new Error('Error deleting contacts. Please contact admininstrator');
-                        error.statusCode = 500;
-                        throw error;
-                    }
-                    const ids = people.map(person => person.dataValues.id);
-
-                    return Person.destroy({ where: { id: ids }, transaction: t });
-                }).then(result => {
-                    if(!result) {
-                        const error = new Error('Error deleting contacts');
-                        error.statusCode = 500;
-                        throw error;
-                    }
-                    return company.getJobs({ transaction: t });
-                }).then(jobs => {
-                    if(!jobs) {
-                        const error = new Error('Error deleting jobs');
-                        error.statusCode = 500;
-                        throw error;
-                    }
-                    const ids = jobs.map(job => job.dataValues.id);
-
-                    if(jobs.length === 0) return jobs;
-                    // NB: Destroying the job destroys the applications
-                    else return Job.destroy({ where: { id: ids }, transaction: t });
-                    
-                }).then(result => {
-                    if(!result) {
-                        const error = new Error('Error deleting jobs');
-                        error.statusCode = 500;
-                        throw error;
-                    }
-                    return company.getAddresses({ transaction: t });
-                }).then(addresses => {
-                    if(!addresses) {
-                        const error = new Error('Error deleting addresses');
-                        error.statusCode = 500;
-                        throw error;
-                    }
-                    console.log(`Addresses: ${JSON.stringify(addresses)}`);
-                    const ids = addresses.map(address => address.dataValues.id);
-
-                    if(addresses.length === 0) return addresses;
-                    else return Address.destroy({ where: { id: ids }, transaction: t });
-
-                }).then(result => {
-                    if(!result) {
-                        const error = new Error('Error deleting addresses');
-                        error.statusCode = 500;
-                        throw error;
-                    }
-                    return company.destroy({transaction: t});
-                })
-        )
-    }).then(result => {
-        if(!result) {
-            const error = new Error('Error deleting job');
-            error.statusCode = 500;
-            throw error;
-        }
-        res.status(200).json({msg: 'Company Deleted'});
+        res.status(200).json({ msg: 'Company Deleted' });
         return;
-    }).catch(err => {
-        if(!err.statusCode) err.statusCode = 500; 
+    } catch(err) {
+        console.log(err);
+        if(!err.statusCode) err.statusCode = 500;
         next(err);
         return err;
-    });;
+    }
+
+
+
+
+    // let company;
+
+    // return sequelize.transaction(function(t) {
+    //     return (
+    //         Company
+    //             .findByPk(req.params.id, { transaction: t })
+    //             .then(result => {
+    //                 if(!result) {
+    //                     const error = new Error('Cannot find Company');
+    //                     error.statusCode = 422;
+    //                     throw error;
+    //                 }
+    //                 company = result;
+    //                 // Returns Promise<[Person]>
+    //                 return company.getPeople({transaction: t});
+    //             })
+    //             .then(people => {
+    //                 if(people.length < 1) {
+    //                     const error = new Error('Error deleting contacts. Please contact admininstrator');
+    //                     error.statusCode = 500;
+    //                     throw error;
+    //                 }
+    //                 const ids = people.map(person => person.dataValues.id);
+
+    //                 return Person.destroy({ where: { id: ids }, transaction: t });
+    //             }).then(result => {
+    //                 if(!result) {
+    //                     const error = new Error('Error deleting contacts');
+    //                     error.statusCode = 500;
+    //                     throw error;
+    //                 }
+    //                 return company.getJobs({ transaction: t });
+    //             }).then(jobs => {
+    //                 if(!jobs) {
+    //                     const error = new Error('Error deleting jobs');
+    //                     error.statusCode = 500;
+    //                     throw error;
+    //                 }
+    //                 const ids = jobs.map(job => job.dataValues.id);
+
+    //                 if(jobs.length === 0) return jobs;
+    //                 // NB: Destroying the job destroys the applications
+    //                 else return Job.destroy({ where: { id: ids }, transaction: t });
+                    
+    //             }).then(result => {
+    //                 if(!result) {
+    //                     const error = new Error('Error deleting jobs');
+    //                     error.statusCode = 500;
+    //                     throw error;
+    //                 }
+    //                 return company.getAddresses({ transaction: t });
+    //             }).then(addresses => {
+    //                 if(!addresses) {
+    //                     const error = new Error('Error deleting addresses');
+    //                     error.statusCode = 500;
+    //                     throw error;
+    //                 }
+    //                 console.log(`Addresses: ${JSON.stringify(addresses)}`);
+    //                 const ids = addresses.map(address => address.dataValues.id);
+
+    //                 if(addresses.length === 0) return addresses;
+    //                 else return Address.destroy({ where: { id: ids }, transaction: t });
+
+    //             }).then(result => {
+    //                 if(!result) {
+    //                     const error = new Error('Error deleting addresses');
+    //                     error.statusCode = 500;
+    //                     throw error;
+    //                 }
+    //                 return company.destroy({transaction: t});
+    //             })
+    //     )
+    // }).then(result => {
+    //     if(!result) {
+    //         const error = new Error('Error deleting job');
+    //         error.statusCode = 500;
+    //         throw error;
+    //     }
+    //     res.status(200).json({msg: 'Company Deleted'});
+    //     return;
+    // }).catch(err => {
+    //     if(!err.statusCode) err.statusCode = 500; 
+    //     next(err);
+    //     return err;
+    // });;
 
 
 };
