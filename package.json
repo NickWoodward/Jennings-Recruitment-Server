@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "mocha 'test/**/*.js' --timeout 10000 --require test/hooks.js",
+    "unit-test": "mocha 'tests/unit/**/*.js' --timeout 10000 --require tests/hooks.js",
+    "integration-test": "mocha 'tests/integration/**/*.js' --timeout 10000 --require tests/hooks.js",
     "start": "nodemon server.js"
   },
   "keywords": [],

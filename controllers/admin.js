@@ -13,6 +13,7 @@ const Person = require('../models/person');
 const Job = require('../models/job');
 const Company = require('../models/company');
 const e = require('express');
+// const CompanyAddress = require('../models/companyAddress');
 
 // View magic methods 
 // console.log(Object.keys(obj.__proto__));
@@ -1357,12 +1358,13 @@ exports.createCompany = async(req, res, next) => {
                 secondLine: req.body.secondLine,
                 city: req.body.city,
                 county: req.body.county,
-                postcode: req.body.postcode
+                postcode: req.body.postcode,
+                companyId: company.id
             }, { transaction: t });
 
             if(!address) { const err = new Error('Error creating Address'); throw err; }
 
-            await company.addAddresses(address, { transaction: t });
+            // await company.addAddresses(address, { transaction: t });
 
             company = await Company.findByPk(company.id, {
                 include: [
@@ -1417,9 +1419,7 @@ exports.createCompany = async(req, res, next) => {
                 jobs,
                 contacts
             }
-            console.log("🚀 ------------------------------------------------------------------------------------------------🚀")
-            console.log("🚀 ~ file: admin.js ~ line 1414 ~ awaitsequelize.transaction ~ formattedCompany", formattedCompany)
-            console.log("🚀 ------------------------------------------------------------------------------------------------🚀")
+
             res.status(201).json({ msg: 'Success', company: formattedCompany });
         
             return;
@@ -1534,15 +1534,16 @@ exports.createAddress = async(req, res, next) => {
                 throw error;
             }
 
-            const address = await Address.create({
+            await Address.create({
                 firstLine: req.body.firstLine,
                 secondLine: req.body.secondLine,
                 city: req.body.city,
                 county: req.body.county,
-                postcode: postcode  
+                postcode: postcode,
+                companyId: company.id
             }, {transaction: t});
 
-            await company.addAddresses(address, {transaction: t});
+            // await company.addAddresses(address, {transaction: t});
 
             res.status(201).json({ msg: 'Address created' });
         });
@@ -1557,10 +1558,30 @@ exports.createAddress = async(req, res, next) => {
     
 exports.deleteCompany = async(req, res, next) => {
     const companyId = req.params.id;
-    console.log(companyId);
     try {
         await sequelize.transaction(async t => {
-            await Company.destroy({ where: { id: companyId } })
+            // Address deletion cascades
+            // Deletion of Contacts cascades, but the underlying Person has to be deleted manually, unless they're an applicant
+            const contacts = await Contact.findAll({ 
+                where: {
+                    companyId: companyId
+                },
+                include: [ Person ]
+            });
+
+            // A contact *has* to always exist
+            if(contacts.length < 1) { const error = new Error('No Contact Exists'); error.statusCode = 422; throw error; }
+
+            // If the contact is a person that is not an applicant, delete them
+            for(const {person} of contacts) {
+                const applicant = await person.getApplicant({transaction: t});
+
+                if(!applicant) {
+                    await person.destroy({transaction: t});
+                }
+            }
+
+            await Company.destroy({ where: { id: companyId }, transaction: t })
         });
 
         res.status(200).json({ msg: 'Company Deleted' });

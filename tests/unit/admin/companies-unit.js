@@ -4,18 +4,18 @@ const chaiHttp = require('chai-http');
 chai.use(chaiHttp);
 const sinon = require('sinon');
 
-const app = require('../../app');
+const app = require('../../../app');
 const { Op } = require('sequelize');
 
 // Models
-const Company = require('../../models/company');
-const Person = require('../../models/person');
-const Address = require('../../models/address');
-const CompanyAddress = require('../../models/companyAddress');
-const Contact = require('../../models/contact');
+const Company = require('../../../models/company');
+const Person = require('../../../models/person');
+const Address = require('../../../models/address');
+const CompanyAddress = require('../../../models/companyAddress');
+const Contact = require('../../../models/contact');
 
-const adminController = require('../../controllers/admin');
-const { createString } = require('../../util/utils');
+const adminController = require('../../../controllers/admin');
+const { createString } = require('../../../util/utils');
 
 const numOfTestCompanies = 4;
 const numOfTestCompanyAddresses = 4;
@@ -75,7 +75,7 @@ describe('Admin Controller: Companies', function() {
         expect(res.total).to.be.equal(res.companies.length);
     });
 
-    // 4 scenarios when adding the row:
+    // 4 scenarios when getting companies with a specific row highlighted:
         // Opt 1: array length + row to be added > limit && row is in array => splice that row
         // Opt 2: array length + row to be added > limit && row *isn't* in array => pop a row
         // Opt 3: array length + row < limit, but row is in the array => splice that row 
@@ -386,27 +386,35 @@ describe('Admin Controller: Companies', function() {
 
 ///////// DELETE COMPANIES /////////
 
-    it.only('should return 200 when a company with the given ID is deleted', async() => {
-        const randomId = Math.ceil(Math.random() * numOfTestCompanies);
+    // it.only('should return 200 when a company with the given ID is deleted', async() => {
+    //     const randomId = Math.ceil(Math.random() * numOfTestCompanies);
 
-        const req = { params: { id: randomId } };
-        const res = {
-            statusCode: 500,
-            msg: '',
-            status: function(code) {
-                this.statusCode = code;
-                return this;
-            },
-            json: function(data) {
-                this.msg = data.msg;
-            }
-        };
+    //     sinon.stub(Company, 'findAndCountAll');
+    //     Company.findAndCountAll.resolves({
 
-        await adminController.deleteCompany(req, res, () => {});
+    //     });
+
+    //     sinon.stub(Company, 'destroy')
+
+    //     const req = { params: { id: randomId } };
+    //     const res = {
+    //         statusCode: 500,
+    //         msg: '',
+    //         status: function(code) {
+    //             this.statusCode = code;
+    //             return this;
+    //         },
+    //         json: function(data) {
+    //             this.msg = data.msg;
+    //         }
+    //     };
+
+    //     await adminController.deleteCompany(req, res, () => {});
+    //     const companies = adminController.getCompanies();
        
-        expect(res.statusCode).to.be.equal(200);
-        expect(res.msg).to.be.equal('Company Deleted');
-    })
+    //     expect(res.statusCode).to.be.equal(200);
+    //     expect(res.msg).to.be.equal('Company Deleted');
+    // })
 
 /////// END DELETE COMPANIES ///////
 

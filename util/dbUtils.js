@@ -10,15 +10,19 @@ const CompanyAddress = require('../models/companyAddress');
 
 //@TODO: Check these foriegn keys are correct in both
 exports.createDatabaseAssociations = () => {
-    console.log('Creating associations');
+    // console.log('Creating associations');
 
     // Companies 1:M Jobs
     Company.hasMany(Job, { foreignKey: { name: 'companyId', allowNull: false} });
     Job.belongsTo(Company, { foreignKey: { name: 'companyId', allowNull: false} });
 
-    // Address M:N Companies
-    Company.belongsToMany(Address, { through: CompanyAddress });
-    Address.belongsToMany(Company, { through: CompanyAddress });
+    // // Address M:N Companies
+    // Company.belongsToMany(Address, { through: CompanyAddress })
+    // Address.belongsToMany(Company, { through: CompanyAddress });
+
+    // Companies 1:M Address
+    Company.hasMany(Address, { foreignKey: { name: 'companyId', allowNull: false }, onDelete: 'CASCADE' });
+    Address.belongsTo(Company, { foreignKey: { name: 'companyId', allowNull: false }, onDelete: 'CASCADE' });
 
     // Applicant is a subtype of Person
     Person.hasOne(Applicant, { foreignKey: { name: 'personId', allowNull: false, unique: true } });
@@ -39,8 +43,7 @@ exports.createDatabaseAssociations = () => {
     // Person.belongsToMany(Company, { through: Contact });
     // Company.belongsToMany(Person, { through: Contact });
 
-    // **** association created to make a M:N relationship
-    Company.hasMany(Contact);
+    Company.hasMany(Contact, { onDelete: 'CASCADE' });
     Contact.belongsTo(Person);
     
     Person.hasMany(Contact)
@@ -64,15 +67,15 @@ exports.populateDB = async() => {
 
 
     // Addresses
-    const address1 = await Address.create({ firstLine: 'Kemp House', secondLine: '152 city road', city: 'Bristol', county: 'Bristol', postcode: 'BS15 1PQ' });
-    const address2 = await Address.create({ firstLine: 'Forge House', secondLine: '', city: 'Swindon', county: 'Wiltshire', postcode: 'SN12 5EK' });
-    const address3 = await Address.create({ firstLine: '306 Stonehill Drive', secondLine: 'Haversely', city: 'Salisbury', county: 'Wiltshire', postcode: 'SN12 5EK' });
-    const address4 = await Address.create({ firstLine: '306 City Road', secondLine: '', city: 'London', county: 'Greater London', postcode: 'EC1V 2NX' });
+    const address1 = await Address.create({ firstLine: 'Kemp House', secondLine: '152 city road', city: 'Bristol', county: 'Bristol', postcode: 'BS15 1PQ', companyId: 1 });
+    const address2 = await Address.create({ firstLine: 'Forge House', secondLine: '', city: 'Swindon', county: 'Wiltshire', postcode: 'SN12 5EK', companyId: 3 });
+    const address3 = await Address.create({ firstLine: '306 Stonehill Drive', secondLine: 'Haversely', city: 'Salisbury', county: 'Wiltshire', postcode: 'SN12 5EK', companyId: 4 });
+    const address4 = await Address.create({ firstLine: '306 City Road', secondLine: '', city: 'London', county: 'Greater London', postcode: 'EC1V 2NX', companyId: 2 });
 
-    await company1.addAddress(address1);
-    await company2.addAddress(address4);
-    await company3.addAddress(address2);
-    await company4.addAddress(address3);
+    // await company1.addAddress(address1);
+    // await company2.addAddress(address4);
+    // await company3.addAddress(address2);
+    // await company4.addAddress(address3);
 
     // // Applicants
     const person1 = await Person.create({ firstName: 'Nick', lastName: 'Woodward', phone: '074843732635', email: 'nickwoodward@gmail.com' });
