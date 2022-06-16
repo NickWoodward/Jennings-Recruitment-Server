@@ -16,15 +16,14 @@ const adminController = require('../../../controllers/admin');
 // CompanyAddress is deleted
 // Address is deleted
 // Contact is deleted
-// Person is deleted (?) Maybe if not an applicant?
-// Jobs are deleted - applicants are not
+// Person is deleted if not an applicant
+// Jobs and applications are deleted - applicants are not
 
 const NUM_TEST_COMPANIES = 4;
 const COMPANY_WITH_JOB_AND_APPLICATION = 2;
 
 describe('Admin Controller: Companies', function() {
     ///// DELETE COMPANIES /////
-
     it('should delete the company with the given id', async() => {
         const randomId = Math.ceil(Math.random() * NUM_TEST_COMPANIES);
 
@@ -198,7 +197,7 @@ describe('Admin Controller: Companies', function() {
         expect(res.msg).to.be.equal('Company Deleted');
     });
 
-    it.only('should delete the applications to the company jobs, but leave the applicant', async() => {
+    it('should delete the applications to the company jobs, but leave the applicant', async() => {
         // Picking a company with a job saves having to create applications, applicants, and people
         const companyId = COMPANY_WITH_JOB_AND_APPLICATION;
 
@@ -256,6 +255,14 @@ describe('Admin Controller: Companies', function() {
 
         // There should be applicants before and after company deletion
         expect(applicantIdsAfter).to.deep.equals([...new Set(applicantIdsBefore)]);
+    });
+
+    ///// DELETE ADDRESSES /////
+    it('should delete the address with the given id', async() => {
+        const req = { params: { id } };
+        const res = {
+            
+        };
     });
 
 

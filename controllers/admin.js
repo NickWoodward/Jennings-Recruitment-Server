@@ -1927,3 +1927,11 @@ exports.editAddress = async(req, res, next) => {
         return err;
     }
 };
+
+exports.deleteAddress = async(req, res, next) => {
+    const addressId = req.params.id;
+
+    const address = await Address.findByPk(addressId);
+
+    console.dir(address.toJSON(), {depth: 2});
+};

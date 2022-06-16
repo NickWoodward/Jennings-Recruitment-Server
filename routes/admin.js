@@ -545,6 +545,7 @@ router.delete('/delete/applicant/:id', adminController.deleteApplicant);
 router.delete('/delete/application/:id', adminController.deleteApplication);
 router.delete('/delete/job/:id', adminController.deleteJob);
 router.delete('/delete/company/:id', adminController.deleteCompany);
+router.delete('/delete/address/:id', adminController.deleteAddress);
 
 
 
