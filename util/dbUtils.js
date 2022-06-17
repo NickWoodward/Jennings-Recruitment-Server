@@ -44,10 +44,10 @@ exports.createDatabaseAssociations = () => {
     // Company.belongsToMany(Person, { through: Contact });
 
     Company.hasMany(Contact, { onDelete: 'CASCADE' });
-    Contact.belongsTo(Person);
-    
-    Person.hasMany(Contact)
     Contact.belongsTo(Company);
+
+    Contact.belongsTo(Person);
+    Person.hasMany(Contact)
     // ****
 }
 

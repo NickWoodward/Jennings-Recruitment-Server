@@ -1509,7 +1509,7 @@ exports.createAddress = async(req, res, next) => {
         } 
 
         // Validation regex for postcode ignores spaces, strip any out
-        const postcode = req.body.postcode.replaceAll(' ', '');
+        const postcodeNoSpace = req.body.postcode.replaceAll(' ', '');
         const companyId = req.body.id;
 
         await sequelize.transaction(async(t) => {
@@ -1534,18 +1534,25 @@ exports.createAddress = async(req, res, next) => {
                 throw error;
             }
 
-            await Address.create({
+            const {
+                id, 
+                firstLine, 
+                secondLine, 
+                city, 
+                county, 
+                postcode
+            } = await Address.create({
                 firstLine: req.body.firstLine,
                 secondLine: req.body.secondLine,
                 city: req.body.city,
                 county: req.body.county,
-                postcode: postcode,
+                postcode: postcodeNoSpace,
                 companyId: company.id
             }, {transaction: t});
 
             // await company.addAddresses(address, {transaction: t});
 
-            res.status(201).json({ msg: 'Address created' });
+            res.status(201).json({ msg: 'Address created', address: {id, firstLine, secondLine, city, county, postcode} });
         });
 
     } catch(err) {
@@ -1933,5 +1940,15 @@ exports.deleteAddress = async(req, res, next) => {
 
     const address = await Address.findByPk(addressId);
 
-    console.dir(address.toJSON(), {depth: 2});
+    try {
+        await address.destroy();
+
+        res.status(200).json({ msg: 'Address deleted' });
+
+    } catch(err) {
+        console.log(err);
+        if(!err.statusCode) err.statusCode = 500;
+        next(err);
+        return err;
+    }
 };

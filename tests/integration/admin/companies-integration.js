@@ -258,12 +258,66 @@ describe('Admin Controller: Companies', function() {
     });
 
     ///// DELETE ADDRESSES /////
-    it('should delete the address with the given id', async() => {
-        const req = { params: { id } };
+    it.only('should delete the address with the given id', async() => {
+        // Add a company and an address
+        const company = await Company.create({
+            name: 'Test',
+            contacts: [
+                {
+                    position: 'position',
+                    person: {
+                        firstName: 'firstName',
+                        lastName: 'lastName',
+                        phone: 'phone',
+                        email: 'email'
+                    }
+                }
+            ],
+            addresses: [
+                {
+                    firstLine: 'firstLine',
+                    secondLine: 'secondLine',
+                    city: 'city',
+                    county: 'county',
+                    postcode: 'postcode'
+                }
+            ]
+        }, {
+            include: [
+                {
+                    model: Contact,
+                    include: Person
+                },
+                {
+                    model: Address
+                }
+            ]
+        });
+
+        const { addresses: [{ id: addressId }]  } = company;
+
+        const req = { params: { id:addressId } };
         const res = {
-            
+            statusCode: 500,
+            msg: '',
+            status: function(code) {
+                this.statusCode = code;
+                return this;
+            },
+            json: function(data) {
+                this.msg = data.msg;
+                return this;
+            }
         };
+
+        await adminController.deleteAddress(req, res, ()=>{});
+
+        const result = await Address.findByPk(addressId);
+        
+        expect(result).to.be.equal(null);
     });
+
+
 
 
     // #TODO: Shouldn't let the last contact be deleted
