@@ -258,7 +258,7 @@ describe('Admin Controller: Companies', function() {
     });
 
     ///// DELETE ADDRESSES /////
-    it.only('should delete the address with the given id', async() => {
+    it('should delete the address with the given id', async() => {
         // Add a company and an address
         const company = await Company.create({
             name: 'Test',
@@ -317,11 +317,216 @@ describe('Admin Controller: Companies', function() {
         expect(result).to.be.equal(null);
     });
 
+    ///// DELETE CONTACTS /////
+    it('should delete the contact, *and* the person if they are not an applicant', async() => {
+        // Add a company and 3 contacts (2 deleted, 1 has to remain)
+        const company = await Company.create({
+            name: 'Test',
+            contacts: [
+                {
+                    position: 'position',
+                    person: {
+                        firstName: 'firstName',
+                        lastName: 'lastName',
+                        phone: 'phone',
+                        email: 'email'
+                    }
+                },
+                {
+                    position: 'position2',
+                    person: {
+                        firstName: 'firstName2',
+                        lastName: 'lastName2',
+                        phone: 'phone2',
+                        email: 'email2'
+                    }
+                },
+                {
+                    position: 'position3',
+                    person: {
+                        firstName: 'firstName3',
+                        lastName: 'lastName3',
+                        phone: 'phone3',
+                        email: 'email3'
+                    }
+                }
+            ],
+            addresses: [
+                {
+                    firstLine: 'firstLine',
+                    secondLine: 'secondLine',
+                    city: 'city',
+                    county: 'county',
+                    postcode: 'postcode'
+                }
+            ]
+        }, {
+            include: [
+                {
+                    model: Contact,
+                    include: Person
+                },
+                {
+                    model: Address
+                }
+            ]
+        });
 
+        const contact1 = company.contacts[0];
+        const person1 = contact1.person;
+        const contact2 = company.contacts[1];
+        const person2 = contact2.person;
 
+        // Make contact1 apply for a job
+        const applicant = await Applicant.create({ cvUrl: '', personId: person1.id });
 
-    // #TODO: Shouldn't let the last contact be deleted
-    // #TODO: Shouldn't let the last address be deleted
+        const req1 = { params: { id: contact1.id } };
+        const req2 = { params: { id: contact2.id } };
+        let res1 = {
+            statusCode: 500,
+            msg: '',
+            status: function(code) {
+                this.statusCode = code;
+                return this;
+            },
+            json: function(data) {
+                this.msg = data.msg;
+                return this;
+            }
+        };
+        const res2 = {
+            statusCode: 500,
+            msg: '',
+            status: function(code) {
+                this.statusCode = code;
+                return this;
+            },
+            json: function(data) {
+                this.msg = data.msg;
+                return this;
+            }
+        }
+
+        // Delete contact 1, person 1 should remain
+        await adminController.deleteContact(req1, res1, ()=>{});
+        // Delete contact 2, person 2 should be deleted
+        await adminController.deleteContact(req2, res2, ()=>{});
+
+        const [person1After, person2After, applicantAfter] = await Promise.all([
+            Person.findByPk(person1.id),
+            Person.findByPk(person2.id),
+            Applicant.findOne({ where: { personId: applicant.personId } })
+        ]);
+
+        expect(person1After.id).to.be.equal(person1.id);
+        expect(person2After).to.be.equal(null);
+        expect(applicantAfter.id).to.be.equal(applicant.id)
+    });
+
+    it('should not delete the last contact', async() => {
+        const company = await Company.create({
+            name: 'test',
+            contacts: [
+                {
+                    position: 'position',
+                    person: {
+                        firstName: 'firstName',
+                        lastName: 'lastName',
+                        phone: 'phone',
+                        email: 'email'
+                    }
+                }
+            ],
+            addresses: [
+                {
+                    firstLine: 'firstLine',
+                    secondLine: 'secondLine',
+                    city: 'city',
+                    county: 'county',
+                    postcode: 'postcode'
+                }
+            ]
+        }, {
+            include: [
+                { 
+                    model: Contact,
+                    include: [Person]
+                },
+                Address
+            ]
+        });
+
+        const req = { params: { id: company.contacts[0].id } };
+        const res = {
+            statusCode: 500,
+            msg: '',
+            status: function(code) {
+                this.statusCode = code;
+                return this;
+            },
+            json: function(data) {
+                this.msg = data.msg;
+                return this;
+            }
+        };
+
+        const err = await adminController.deleteContact(req, res, () => {});
+        expect(err).to.be.an("error");
+        expect(err.statusCode).to.be.equal(422);
+        expect(err.message).to.be.equal('Cannot delete last contact');
+    });
+
+    it.only('should not delete the last address', async() => {
+        const company = await Company.create({
+            name: 'test',
+            contacts: [
+                {
+                    position: 'position',
+                    person: {
+                        firstName: 'firstName',
+                        lastName: 'lastName',
+                        phone: 'phone',
+                        email: 'email'
+                    }
+                }
+            ],
+            addresses: [
+                {
+                    firstLine: 'firstLine',
+                    secondLine: 'secondLine',
+                    city: 'city',
+                    county: 'county',
+                    postcode: 'postcode'
+                }
+            ]
+        }, {
+            include: [
+                { 
+                    model: Contact,
+                    include: [Person]
+                },
+                Address
+            ]
+        });
+        const req = { params: { id: company.addresses[0].id } };
+        const res = {
+            statusCode: 500,
+            msg: '',
+            status: function(code) {
+                this.statusCode = code;
+                return this;
+            },
+            json: function(data) {
+                this.msg = data.msg;
+                return this;
+            }
+        };
+
+        const error = await adminController.deleteAddress(req, res, () => {});
+        expect(error).to.be.an('error')
+        expect(error.statusCode).to.be.equal(422);
+        expect(error.message).to.be.equal('Cannot delete last address');
+    })
 
 
 

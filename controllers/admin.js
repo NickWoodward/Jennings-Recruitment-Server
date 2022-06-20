@@ -1448,7 +1448,7 @@ exports.createContact = async (req, res, next) => {
         }
         
         // Validation regex for phone # ignores spaces, strip any out
-        const phone = req.body.phone.replaceAll(' ', '');
+        const phoneNoSpace = req.body.phone.replaceAll(' ', '');
         const companyId = req.body.id;
 
         await sequelize.transaction(async(t) => {
@@ -1468,7 +1468,7 @@ exports.createContact = async (req, res, next) => {
                 person = await Person.create({ 
                     firstName: req.body.firstName,
                     lastName: req.body.lastName,
-                    phone: phone,
+                    phone: phoneNoSpace,
                     email: req.body.email
                 }, { transaction: t });
             } else {
@@ -1480,13 +1480,14 @@ exports.createContact = async (req, res, next) => {
             const contact = await Contact.create({
                 position: req.body.position,
             }, { transaction: t });
-    
+            const { contactId, personId, firstName, lastName, phone, email, position } = contact;
+
             if(!contact) { const err = new Error('Error creating Contact'); throw err; }
-    
+            
             await contact.setPerson(person, { transaction: t });
             await company.addContact(contact, { transaction: t });
 
-            res.status(201).json({ msg: 'Contact created' });
+            res.status(201).json({ msg: 'Contact created', contact: { contactId, personId, firstName, lastName, phone, email, position } });
         })
  
     } catch(err) {
@@ -1554,7 +1555,6 @@ exports.createAddress = async(req, res, next) => {
 
             res.status(201).json({ msg: 'Address created', address: {id, firstLine, secondLine, city, county, postcode} });
         });
-
     } catch(err) {
         console.log(err);
         if(!err.statusCode) err.statusCode = 500;
@@ -1562,7 +1562,7 @@ exports.createAddress = async(req, res, next) => {
         return err;
     }
 }
-    
+
 exports.deleteCompany = async(req, res, next) => {
     const companyId = req.params.id;
     try {
@@ -1938,12 +1938,64 @@ exports.editAddress = async(req, res, next) => {
 exports.deleteAddress = async(req, res, next) => {
     const addressId = req.params.id;
 
-    const address = await Address.findByPk(addressId);
-
     try {
+
+        const address = await Address.findByPk(addressId, {
+            include: [
+                {
+                    model: Company,
+                    include: Address
+                }
+            ]
+        });
+        
+        if(address.company.addresses.length === 1) {
+            const error = new Error('Cannot delete last address');
+            error.statusCode = 422;
+            throw error;
+        }
+
         await address.destroy();
 
         res.status(200).json({ msg: 'Address deleted' });
+
+    } catch(err) {
+        console.log(err);
+        if(!err.statusCode) err.statusCode = 500;
+        next(err);
+        return err;
+    }
+};
+
+exports.deleteContact = async(req, res, next) => {
+    const contactId = req.params.id;
+
+    try {
+        const contact = await Contact.findByPk(contactId, {
+            include: [
+                { 
+                    model: Person,
+                    include: Applicant
+                },
+                { model: Company, include: Contact } 
+            ]
+        });
+
+        if(contact.company.contacts.length === 1) {
+            const err = new Error('Cannot delete last contact');
+            err.statusCode = 422;
+            throw err;
+        }
+
+        // If they aren't an applicant, delete the person too
+        if(!contact.person.applicant) {
+            await contact.person.destroy(),
+            await contact.destroy()
+        } else {
+            await contact.destroy();
+        }
+
+        res.status(200).json({ msg: 'Contact deleted' });
 
     } catch(err) {
         console.log(err);

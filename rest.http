@@ -129,5 +129,12 @@ content-type: application/json
 ###
 
 DELETE http://localhost:8080/admin/delete/company/2
+###
+
+DELETE http://localhost:8080/admin/delete/address/2
+###
+
+DELETE http://localhost:8080/admin/delete/contact/1
+###
 
 GET http://localhost:8080/admin/jobnames
