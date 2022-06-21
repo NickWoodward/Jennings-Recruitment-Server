@@ -21,8 +21,11 @@ exports.createDatabaseAssociations = () => {
     // Address.belongsToMany(Company, { through: CompanyAddress });
 
     // Companies 1:M Address
-    Company.hasMany(Address, { foreignKey: { name: 'companyId', allowNull: false }, onDelete: 'CASCADE' });
-    Address.belongsTo(Company, { foreignKey: { name: 'companyId', allowNull: false }, onDelete: 'CASCADE' });
+    Company.hasMany(Address, { foreignKey: { name: 'companyId', allowNull: true }, onDelete: 'CASCADE' });
+    Address.belongsTo(Company, { foreignKey: { name: 'companyId', allowNull: true }, onDelete: 'CASCADE' });
+
+    Address.belongsTo(Person, { foreignKey: { name: 'personId', allowNull: true }, onDelete: 'CASCADE' });
+    Person.hasMany(Address, { foreignKey: { name: 'personId', allowNull: true }, onDelete: 'CASCADE' });
 
     // Applicant is a subtype of Person
     Person.hasOne(Applicant, { foreignKey: { name: 'personId', allowNull: false, unique: true } });
@@ -72,6 +75,8 @@ exports.populateDB = async() => {
     const address3 = await Address.create({ firstLine: '306 Stonehill Drive', secondLine: 'Haversely', city: 'Salisbury', county: 'Wiltshire', postcode: 'SN12 5EK', companyId: 4 });
     const address4 = await Address.create({ firstLine: '306 City Road', secondLine: '', city: 'London', county: 'Greater London', postcode: 'EC1V 2NX', companyId: 2 });
 
+
+
     // await company1.addAddress(address1);
     // await company2.addAddress(address4);
     // await company3.addAddress(address2);
@@ -84,6 +89,11 @@ exports.populateDB = async() => {
     const applicant2 = await Applicant.create({ personId: person2.id });
     const person3 = await Person.create({ firstName: 'Jeff', lastName: 'Wode', phone: '074843732635', email: 'wode@gmail.com' });
     const applicant3 = await Applicant.create({ personId: person3.id });
+
+    const address5 = await Address.create({ firstLine: '35 Pevey Road', secondLine: '', city: 'Leeds', county: 'West Yorkshire', postcode: 'LS6 2NX', personId: 1 });
+    const address6 = await Address.create({ firstLine: '97 Donnington Road', secondLine: '', city: 'Reading', county: 'Berkshire', postcode: 'RG1 5NE', personId: 2 });
+    const address7 = await Address.create({ firstLine: '306 Rosey Lane', secondLine: '', city: 'Marlborough', county: 'Wiltshire', postcode: 'SN9 8PR', personId: 3 });
+
 
     await job1.addApplicant(applicant1);
     await job1.addApplicant(applicant2);

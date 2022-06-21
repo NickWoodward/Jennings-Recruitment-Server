@@ -13,12 +13,6 @@ const Application = require('../../../models/application');
 
 const adminController = require('../../../controllers/admin');
 
-// CompanyAddress is deleted
-// Address is deleted
-// Contact is deleted
-// Person is deleted if not an applicant
-// Jobs and applications are deleted - applicants are not
-
 const NUM_TEST_COMPANIES = 4;
 const COMPANY_WITH_JOB_AND_APPLICATION = 2;
 
@@ -476,7 +470,7 @@ describe('Admin Controller: Companies', function() {
         expect(err.message).to.be.equal('Cannot delete last contact');
     });
 
-    it.only('should not delete the last address', async() => {
+    it('should not delete the last address', async() => {
         const company = await Company.create({
             name: 'test',
             contacts: [
@@ -527,10 +521,6 @@ describe('Admin Controller: Companies', function() {
         expect(error.statusCode).to.be.equal(422);
         expect(error.message).to.be.equal('Cannot delete last address');
     })
-
-
-
-
 
     //////// END DELETE ////////
 });

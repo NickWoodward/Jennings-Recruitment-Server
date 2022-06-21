@@ -293,16 +293,15 @@ exports.deleteApplication = async(req, res, next) => {
 
 //@TODO: validation
 exports.createApplicant = (req, res, next) => {
-    // const errors = validationResult(req);
-    // console.log(errors);
-    // if(!errors.isEmpty()) {
-    //     console.log(errors);
-    //     const error = new Error('Validation Error');
-    //     error.statusCode = 422;
-    //     throw error;
-    // }
+    const errors = validationResult(req);
+    if(!errors.isEmpty()) {
+        console.log(errors);
+        const error = new Error('Validation Error');
+        error.statusCode = 422;
+        throw error;
+    }
     const { firstName, lastName, phone, email } = req.body;
-    const cvUrl = req.file? req.file.filename: null;
+    let cvUrl = req.file? req.file.filename: null;
     let persistPerson;
 
     Person.create({
@@ -326,8 +325,7 @@ exports.createApplicant = (req, res, next) => {
         }
         const { firstName, lastName, email, phone } = persistPerson;
         const { id: applicantId } = applicant;
-        const cvName = cvUrl || null;
-        const cvType = cvName? cvName.slice(cvName.lastIndexOf('.')):null;
+
 
         const person = {
             applicantId,
@@ -335,12 +333,12 @@ exports.createApplicant = (req, res, next) => {
             lastName,
             email,
             phone,
-            cvName,
-            cvType,
+            // cvName,
+            // cvType,
         }
-
+  
         res.status(201).json({ msg: "Success", user: person });
-    }).catch(err => next(err));
+    }).catch(err => { console.log(err); next(err)});
 };
 
 exports.deleteApplicant = (req, res, next) => {
@@ -412,69 +410,146 @@ exports.editApplicant = (req, res, next) =>{
 
 
 
-exports.getApplicants = (req, res, next) => {
-
+exports.getApplicants = async (req, res, next) => {
+    const findOne = req.query.indexId;
     const index = req.query.index || 0;
     const limit = req.query.limit || 10;
     const orderField = req.query.orderField || 'createdAt';
-    const order = req.query.orderDirection || 'DESC';
-    Applicant.findAndCountAll({
-        limit: parseInt(limit, 10),
-        offset: parseInt(index),
-        order: [[orderField, order]],
-        distinct: true,
-        attributes: [
-            'id',
-            'cvUrl',
-            'createdAt',
-            [Sequelize.fn('date_format', Sequelize.col('applicant.createdAt' ), '%d/%m/%y'), 'userDate']
-        ],
-        include: [
-            {
-                model: Job,
-                include: [ 
-                    {
-                        model: Company,
-                        attributes: [ 'id', 'name' ]
-                    } 
-                ],
-                attributes: [ 'id', 'title', 'location' ]
-            },
-            {
-                model: Person,
-                attributes: [ 'firstName', 'lastName', 'phone', 'email' ]
+    const orderDirection = req.query.orderDirection || 'DESC';
+    let order;
+    let topRow;
+
+    // Set Ordering
+    switch(req.query.orderField) {
+        // Add other cases (see getApplications)
+        default: 
+            order = [orderField, orderDirection];
+    }
+
+    // Set the attributes for both the single highlight row and the returned rows
+    const applicantAttributes = [
+        'id',
+        'cvUrl',
+        'createdAt',
+        [Sequelize.fn('date_format', Sequelize.col('applicant.createdAt' ), '%d/%m/%y'), 'userDate']
+    ];
+    const personAttributes = [ 'id', 'firstName', 'lastName', 'phone', 'email' ];
+    const jobAttributes = [ 'id', 'title', 'location' ];
+    const companyAttributes = [ 'id', 'name' ];
+    const included = [
+        {
+            model: Person,
+            attributes: personAttributes,
+            include: Address 
+        },
+        {
+            model: Job,
+            attributes: jobAttributes,
+            include: [
+                {
+                    model: Company,
+                    attributes: companyAttributes
+                }
+            ]
+        }
+
+    ];
+
+    try {
+        // Find the specific row to highlight if indexId provided
+        if(findOne) {
+            topRow = await Applicant.findByPk(findOne, {
+                attributes: applicantAttributes,
+                include: included
+            });
+
+            // Format the top row
+            topRow = formatApplicants([topRow])[0];
+        }
+
+        const options = {
+            attributes: applicantAttributes,
+            include: included,
+            order: [order],
+            distinct: true, 
+        }
+
+        if(req.query.limit) options.limit = parseInt(limit, 10);
+        if(req.query.index) options.offset = parseInt(index, 10);
+
+        const results = await Applicant.findAndCountAll(options);
+        results.rows = formatApplicants(results.rows);
+
+       // If there's a row to be highlighted
+       if(topRow) {
+        const visible = results.rows.filter(applicant => applicant.id === topRow.id)[0];
+        const index = results.rows.findIndex(applicant => applicant.id === topRow.id);
+        // 1 too many results in the array
+        if(results.rows.length + 1 > limit) {
+            // If the row appears in the array to be returned, remove it
+            if(visible) {
+                console.log('VISIBLE + LIMIT REACHED => SPLICE:  ', {visible});
+                results.rows.splice(index, 1);
+
+            } else {
+                console.log('NOT VISIBLE + LIMIT REACHED => POP', {visible});
+                console.log(index);
+
+                // Remove the last element instead
+                results.rows.pop();
             }
-        ], 
+        } else { 
+            if(visible) {
+                console.log('VISIBLE + LIMIT NOT REACHED REACHED',{visible});
+                console.log(index);
+
+                results.rows.splice(index, 1);
+            } else {
+                console.log('NOT VISIBLE + LIMIT NOT REACHED', {visible});
+                console.log(index);
+
+            }
+
+        }
         
-    })
-        .then(applicants => {
-            if(applicants) {
-                applicants.rows = applicants.rows.map(({ 
-                    dataValues: {    
-                        id:applicantId, 
-                        userDate, 
-                        jobs,
-                        person: { firstName, lastName, phone, email },
-                        cvUrl
-                    }
-                }) => {
-                    const cvType = cvUrl? cvUrl.slice(cvUrl.lastIndexOf('.')):null;
-                    const cvName = cvUrl? cvUrl.slice(12): 'No CV uploaded';
-                    // Format jobs array
-                    jobs = jobs.map(({ id:jobId, title, location, company: { id:companyId, name: companyName } }) => {
-                        return { jobId, title, location, companyId, companyName };
-                    });
-                    // Format containing applicant
-                    return { applicantId, firstName, lastName, phone, email, cvType, cvName, userDate, jobs };
-                });
-                
-                console.log('Applicants: ' + applicants.count);
+        // Add the highlighted topRow to the array
+        results.rows.unshift(topRow) 
+    }
 
-                res.status(200).json({ applicants: applicants.rows, total: applicants.count });
-            }
-        }).catch(err => console.log(err));
+        res.status(200).json({ applicants: results.rows, applicantTotal: results.count });
 
-};
+    } catch(err) {
+        console.log(err);
+        if(!err.statusCode) err.statusCode = 500;
+        next(err);
+        return err;
+    }
+
+}
+
+const formatApplicants = (applicants) => {
+    const result = applicants.map(({
+        dataValues: { id, userDate, cvUrl, jobs, person: { id: personId, firstName, lastName, phone, email, addresses } }
+    }) => {
+        // const cvType = cvUrl? cvUrl.slice(cvUrl.lastIndexOf('.')):null;
+        // const cvName = cvUrl? cvUrl.slice(12): 'No CV uploaded';
+        const cvName = cvUrl;
+
+        let cvType = null;
+        // If there's a cvName && the name has a '.' in it, extract the extention
+        if(cvName && cvName.lastIndexOf('.') !== -1) {
+            cvType = cvName.slice(cvName.lastIndexOf('.'));
+        }
+        // Format jobs array
+        jobs = jobs.map(({ id:jobId, title, location, company: { id:companyId, name: companyName } }) => {
+            return { jobId, title, location, companyId, companyName };
+        });
+        // Format containing applicant
+        return { id, personId, firstName, lastName, phone, email, cvType, cvName, userDate, jobs, addresses };
+    });
+
+    return result;
+}
 
 exports.getApplicantNames = async (req, res, next) => {
     try {
@@ -1058,7 +1133,6 @@ exports.getCompanies = async (req, res, next) => {
             order = [ orderField, orderDirection ];
     }
 
-    // @TODO: check toprow ordering
     try {
         // Find a specific row to highlight if needed
         if(findOne) {
