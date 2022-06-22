@@ -434,7 +434,12 @@ exports.getApplicants = async (req, res, next) => {
         [Sequelize.fn('date_format', Sequelize.col('applicant.createdAt' ), '%d/%m/%y'), 'userDate']
     ];
     const personAttributes = [ 'id', 'firstName', 'lastName', 'phone', 'email' ];
-    const jobAttributes = [ 'id', 'title', 'location' ];
+    const jobAttributes = [ 
+        'id', 
+        'title', 
+        'location',
+        [Sequelize.fn('date_format', Sequelize.col('jobs.createdAt' ), '%d/%m/%y'), 'jobDate']
+    ];
     const companyAttributes = [ 'id', 'name' ];
     const included = [
         {
@@ -515,7 +520,6 @@ exports.getApplicants = async (req, res, next) => {
         // Add the highlighted topRow to the array
         results.rows.unshift(topRow) 
     }
-
         res.status(200).json({ applicants: results.rows, applicantTotal: results.count });
 
     } catch(err) {
@@ -541,8 +545,8 @@ const formatApplicants = (applicants) => {
             cvType = cvName.slice(cvName.lastIndexOf('.'));
         }
         // Format jobs array
-        jobs = jobs.map(({ id:jobId, title, location, company: { id:companyId, name: companyName } }) => {
-            return { jobId, title, location, companyId, companyName };
+        jobs = jobs.map(( {dataValues: { id:jobId, title, location, jobDate, company: { id:companyId, name: companyName } }}) => {
+            return { jobId, title, location, jobDate, companyId, companyName };
         });
         // Format containing applicant
         return { id, personId, firstName, lastName, phone, email, cvType, cvName, userDate, jobs, addresses };
