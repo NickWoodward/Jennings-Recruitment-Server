@@ -3,6 +3,7 @@ const utils = require('../util/utils');
 const path = require('path');
 const Sequelize = require('sequelize');
 const sequelize = require('../util/database');
+const {Op} = require('sequelize');
 const { validationResult } = require('express-validator');
 
 const Address = require('../models/address');
@@ -12,7 +13,6 @@ const Contact = require('../models/contact');
 const Person = require('../models/person');
 const Job = require('../models/job');
 const Company = require('../models/company');
-const e = require('express');
 // const CompanyAddress = require('../models/companyAddress');
 
 // View magic methods 
@@ -23,7 +23,7 @@ exports.getApplications = async(req, res, next) => {
     const findOne = req.query.indexId;
     const index = req.query.index || 0;
     let limit = req.query.limit || 10;
-    const orderField = req.query.orderField || 'createdAt';
+    const orderField = req.query.orderField || 'id';
     const orderDirection = req.query.orderDirection || 'DESC';
     let order;
     let topRow;
@@ -105,14 +105,6 @@ exports.getApplications = async(req, res, next) => {
                                 }]
                               }
                             ]
-                            // model: Company,
-                            // attributes: [ 'id', 'name' ],
-                            // include: [
-                            //     {
-                            //         model: Person,
-                            //         attributes: [ 'firstName', 'lastName', 'phone', 'email' ]
-                            //     }
-                            // ]
                         } 
                     ]
                 },
@@ -144,8 +136,9 @@ exports.getApplications = async(req, res, next) => {
 
         // If there's a row to be highlighted
         if(topRow) {
-            const visible = applications.rows.filter(application => application.id === topRow.id);
+            const visible = applications.rows.filter(application => application.id === topRow.id)[0];
             const index = applications.rows.findIndex(application => application.id === topRow.id);
+
 
             // 1 too many results in the array
             if(applications.rows.length + 1 > limit) {
@@ -157,7 +150,7 @@ exports.getApplications = async(req, res, next) => {
                     applications.rows.pop();
                 }
             } else { 
-                if(visible) applications.rows.splice(index, 1);
+                if(visible) {applications.rows.splice(index, 1); }
             }
             
             // Add the highlighted topRow to the array
@@ -211,7 +204,48 @@ exports.createApplication = async(req, res, next) => {
         }
 
         await job.addApplicant(applicant);
-        res.status(200).json({ msg: 'success!' });
+
+        const result = await Application.findOne({ 
+            where: { [Op.and]: [{jobId: jobId},{applicantId: applicantId} ] }, 
+            attributes: [ 
+                'id',
+                'applicantId',
+                'jobId',
+                [Sequelize.fn('date_format', Sequelize.col('application.createdAt' ), '%d/%m/%y'), 'applicationDate']
+ 
+            ],
+            include: [
+                {                               
+                    model: Job,
+                    include: [ 
+                        { 
+                            model: Company,
+                            attributes: [ 'id', 'name' ],
+                            include: [
+                              {
+                                model: Contact,
+                                separate: true,
+                                include: [{
+                                  model: Person,
+                                  attributes: [ 'firstName', 'lastName', 'phone', 'email' ]
+                                }]
+                              }
+                            ]
+                        } 
+                    ]
+                },
+                {
+                    model: Applicant,
+                    include: [ 
+                        {
+                            model: Person,
+                            attributes: [ 'id', 'firstName', 'lastName', 'email', 'phone', 'createdAt' ]
+                        } 
+                    ],
+                }
+            ],
+        })
+        res.status(200).json({ application: result, msg: 'success!' });
 
     } catch(err) {
         console.log(err);
@@ -414,7 +448,7 @@ exports.getApplicants = async (req, res, next) => {
     const findOne = req.query.indexId;
     const index = req.query.index || 0;
     const limit = req.query.limit || 10;
-    const orderField = req.query.orderField || 'createdAt';
+    const orderField = req.query.orderField || 'id';
     const orderDirection = req.query.orderDirection || 'DESC';
     let order;
     let topRow;
@@ -422,8 +456,9 @@ exports.getApplicants = async (req, res, next) => {
     // Set Ordering
     switch(req.query.orderField) {
         // Add other cases (see getApplications)
-        default: 
+        default:{ 
             order = [orderField, orderDirection];
+        }
     }
 
     // Set the attributes for both the single highlight row and the returned rows
