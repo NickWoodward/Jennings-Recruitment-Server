@@ -51,6 +51,13 @@ exports.getApplications = async(req, res, next) => {
         // Find a specific row to highlight if needed
         if(findOne) {
             topRow = await Application.findByPk(findOne, {
+                attributes: [ 
+                    'id',
+                    'applicantId',
+                    'jobId',
+                    [Sequelize.fn('date_format', Sequelize.col('application.createdAt' ), '%d/%m/%y'), 'applicationDate']
+     
+                ],
                 include: [
                     {                               
                         model: Job,
