@@ -1599,13 +1599,24 @@ exports.createContact = async (req, res, next) => {
     
             const contact = await Contact.create({
                 position: req.body.position,
-            }, { transaction: t });
-            const { contactId, personId, firstName, lastName, phone, email, position } = contact;
+                person: person
+            }, { 
+                include:{
+                    model: Person,
+                    ignoreDuplicates: true,
+                }, 
+                transaction: t 
+            });
+            const { id: contactId, position, person: { id: personId, firstName, lastName, phone, email }  } = contact;
+
 
             if(!contact) { const err = new Error('Error creating Contact'); throw err; }
             
-            await contact.setPerson(person, { transaction: t });
+            // await contact.setPerson(person, { transaction: t });
             await company.addContact(contact, { transaction: t });
+
+            console.dir(contactId, position, personId, firstName, lastName, phone, email)
+            // console.dir(contact);
 
             res.status(201).json({ msg: 'Contact created', contact: { contactId, personId, firstName, lastName, phone, email, position } });
         })
