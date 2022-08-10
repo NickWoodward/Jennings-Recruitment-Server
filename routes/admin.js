@@ -234,17 +234,31 @@ router.post('/edit/contact', multer().none(), [
         .custom(async (value, {req}) => {
             try{
                 const person = await Person.findOne({ where: { email: req.body.email } });
-                console.log('person',!!person)
+                const contact = await Contact.findOne({ 
+                    where: { id: req.body.id },
+                    include: Person    
+                });
+                // console.dir(person, {depth: 1});
+                // console.dir(contact, {depth: 2});
 
-                // 1: If no one has that email address, OK
-                if(!person) return Promise.resolve();
+                if(person && person.id !== contact.person.id) {
+                    return Promise.reject(`That email belongs to ${person.firstName} ${person.lastName} (Id:${person.id})`);
+                }
 
-                // 2: If the person is the contact in question, OK
-                let contact = await Contact.findOne({ where: { id: req.body.contactId }});
-                if(contact.personId === person.id) return Promise.resolve();
+              
+//                 const person = await Person.findOne({ where: { email: req.body.email } });
+//                 console.log('person',!!person)
+//                 console.dir(person, {depth: 2});
+// console.log(req.body);
+//                 // 1: If no one has that email address, reject
+//                 if(!person) {console.log('Person doesnt exist', {test:'test'}); return Promise.reject('No such contact');}
 
-                // 3: Else reject the request
-                return Promise.reject('Already a contact email address');
+//                 // 2: If there's no contact reject
+//                 let contact = await Contact.findOne({ where: { id: req.body.contactId }});
+//                 if(contact.personId === person.id) {console.log('person is a contact', {test:'test'});return Promise.resolve();}
+
+//                 // 3: Else reject the request
+//                 return Promise.reject('Already a contact email address');
 
             } catch(err) {
                 console.log(err);

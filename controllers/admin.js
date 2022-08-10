@@ -1957,7 +1957,6 @@ exports.editCompany = async (req, res, next) => {
 };  
 
 exports.editContact = async(req, res, next) => {
-    console.log('editContact');
     try {
         const errors = validationResult(req);
         if(!errors.isEmpty()) {
@@ -2000,12 +1999,17 @@ exports.editContact = async(req, res, next) => {
             await person.update(personValues);
             await contact.update(contactValues);
 
-            // Map to the structure returned by every other company route
-            const formattedContacts = company.dataValues.contacts.map(({ dataValues: { id:contactId, position, person: { dataValues: { id: personId, firstName, lastName, phone, email } } }}) => {
-                return { contactId, personId, position, firstName, lastName, phone, email }
-            });
+            // // Map to the structure returned by every other company route
+            // const formattedContacts = company.dataValues.contacts.map(({ dataValues: { id:contactId, position, person: { dataValues: { id: personId, firstName, lastName, phone, email } } }}) => {
+            //     return { contactId, personId, position, firstName, lastName, phone, email }
+            // });
 
-            res.status(201).json({msg:'Contact Edited', contacts: formattedContacts});
+            const { dataValues: { id:contactId, position, person: { dataValues: { id: personId, firstName, lastName, phone, email } } }}  = contact;
+            const formattedContact = { contactId, personId, position, firstName, lastName, phone, email };
+
+            // res.status(201).json({msg:'Contact Edited', contacts: formattedContacts});
+            res.status(201).json({msg:'Contact Edited', contact: formattedContact});
+
         });
 
     } catch(err) {
