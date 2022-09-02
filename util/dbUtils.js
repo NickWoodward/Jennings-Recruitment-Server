@@ -55,11 +55,31 @@ exports.createDatabaseAssociations = () => {
 }
 
 exports.populateDB = async() => {
-    // Companies
-    const company1 = await Company.create({ name: 'Jrs' });
-    const company2 = await Company.create({ name: 'Woolworths' });
-    const company3 = await Company.create({ name: 'Node' });
-    const company4 = await Company.create({ name: 'Dell' });
+
+    const results = await Promise.all([
+        await Company.create({ name: 'Jrs' }),
+        await Company.create({ name: 'Woolworths' }),
+        await Company.create({ name: 'Node' }),
+        await Company.create({ name: 'Dell' }),
+        await Company.create({ name: 'London Fields' }),
+        await Company.create({ name: 'Sky' }),
+        await Company.create({ name: 'Technics' }),
+        await Company.create({ name: 'Ride' }),
+        await Company.create({ name: 'Anker' }),
+    ]);
+
+    const [ company1, company2, company3, company4, company5, company6, company7, company8, company9 ] = results;
+
+    // // Companies
+    // const company1 = await Company.create({ name: 'Jrs' });
+    // const company2 = await Company.create({ name: 'Woolworths' });
+    // const company3 = await Company.create({ name: 'Node' });
+    // const company4 = await Company.create({ name: 'Dell' });
+    // const company5 = await Company.create({ name: 'London Fields' });
+    // const company6 = await Company.create({ name: 'Sky' });
+    // const company7 = await Company.create({ name: 'Technics' });
+    // const company8 = await Company.create({ name: 'Ride' });
+    // const company9 = await Company.create({ name: 'Anker' });
 
     // Jobs
     const job1 = await Job.create({ title: 'IP Counsel', wage: '80000', location: 'Bristol', description: 'An international charity is looking for a Legal Counsel to cover a maternity leave commencing this month.', featured: true, jobType: 'Permanent', position: 'In House', pqe: 4, companyId: company1.id });
@@ -70,10 +90,18 @@ exports.populateDB = async() => {
 
 
     // Addresses
-    const address1 = await Address.create({ firstLine: 'Kemp House', secondLine: '152 city road', city: 'Bristol', county: 'Bristol', postcode: 'BS15 1PQ', companyId: 1 });
-    const address2 = await Address.create({ firstLine: 'Forge House', secondLine: '', city: 'Swindon', county: 'Wiltshire', postcode: 'SN12 5EK', companyId: 3 });
-    const address3 = await Address.create({ firstLine: '306 Stonehill Drive', secondLine: 'Haversely', city: 'Salisbury', county: 'Wiltshire', postcode: 'SN12 5EK', companyId: 4 });
-    const address4 = await Address.create({ firstLine: '306 City Road', secondLine: '', city: 'London', county: 'Greater London', postcode: 'EC1V 2NX', companyId: 2 });
+    await Address.create({ firstLine: 'Kemp House', secondLine: '152 city road', city: 'Bristol', county: 'Bristol', postcode: 'BS15 1PQ', companyId: 1 });
+    await Address.create({ firstLine: 'Forge House', secondLine: '', city: 'Swindon', county: 'Wiltshire', postcode: 'SN12 5EK', companyId: 3 });
+    await Address.create({ firstLine: '306 Stonehill Drive', secondLine: 'Haversely', city: 'Salisbury', county: 'Wiltshire', postcode: 'SN12 5EK', companyId: 4 });
+    await Address.create({ firstLine: '306 City Road', secondLine: '', city: 'London', county: 'Greater London', postcode: 'EC1V 2NX', companyId: 2 });
+    await Address.create({ firstLine: '62 Edinburgh Road', secondLine: '', city: 'Congleton', county: 'Cheshire', postcode: 'CW12 2NE', companyId: 5 });
+    await Address.create({ firstLine: '161 Queens Way', secondLine: '', city: 'Swindon', county: 'Wiltshire', postcode: 'SN8 3PE', companyId: 6 });
+    await Address.create({ firstLine: '30 Churchill Drive', secondLine: '', city: 'Birmingham', county: 'West Midlands', postcode: 'B12 7PR', companyId: 7 });
+    await Address.create({ firstLine: '11 Redhill Drive', secondLine: '', city: 'Birmingham', county: 'West Midlands', postcode: 'B12 8ER', companyId: 8 });
+    await Address.create({ firstLine: '21 Lenton Close', secondLine: '', city: 'Reading', county: 'Berkshire', postcode: 'RG1 8ER', companyId: 9 });
+
+
+
 
 
 
@@ -160,6 +188,31 @@ exports.populateDB = async() => {
     const contact6 = await Contact.create({ position: 'HR' });
     await contact6.setPerson(person9);
     await company4.addContact(contact6);
+
+    const person10 = await Person.create({ firstName: 'Greg', lastName: 'Davis', phone: '0736463748', email: 'gregoryd@gmail.com' });
+    const contact7 = await Contact.create({ position: 'CEO' });
+    await contact7.setPerson(person10);
+    await company5.addContact(contact7);
+
+    const person11 = await Person.create({ firstName: 'Rory', lastName: 'Davis', phone: '0736463748', email: 'rory@gmail.com' });
+    const contact8 = await Contact.create({ position: 'CEO' });
+    await contact8.setPerson(person11);
+    await company6.addContact(contact8);
+
+    const person12 = await Person.create({ firstName: 'Joe', lastName: 'Devine', phone: '0736463748', email: 'joe@gmail.com' });
+    const contact9 = await Contact.create({ position: 'CEO' });
+    await contact9.setPerson(person12);
+    await company7.addContact(contact9);
+
+    const person13 = await Person.create({ firstName: 'Susan', lastName: 'Jones', phone: '0736463748', email: 'susan@gmail.com' });
+    const contact10 = await Contact.create({ position: 'CEO' });
+    await contact10.setPerson(person13);
+    await company8.addContact(contact10);
+
+    const person14 = await Person.create({ firstName: 'Tosia', lastName: 'Pole', phone: '0736463748', email: 'tosia@gmail.com' });
+    const contact11 = await Contact.create({ position: 'CEO' });
+    await contact11.setPerson(person14);
+    await company9.addContact(contact11);
 
     // await person8.addCompany(company4, { through: { position: 'Head of HR' } });
     // await person9.addCompany(company4, { through: { position: 'HR' } });

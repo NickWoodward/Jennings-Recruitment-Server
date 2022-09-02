@@ -233,14 +233,16 @@ router.post('/edit/contact', multer().none(), [
         .normalizeEmail({ all_lowercase: true })
         .custom(async (value, {req}) => {
             try{
-                const person = await Person.findOne({ where: { email: req.body.email } });
-                const contact = await Contact.findOne({ 
-                    where: { id: req.body.id },
-                    include: Person    
-                });
-                // console.dir(person, {depth: 1});
-                // console.dir(contact, {depth: 2});
+                console.log('req.body.contactId', req.body.contactId);
+                const results = await Promise.all([
+                    Person.findOne({ where: { email: req.body.email } }),
+                    Contact.findOne({ 
+                        where: { id: req.body.contactId },
+                        include: Person    
+                    })
+                ]);
 
+                const [person, contact] = results;
                 if(person && person.id !== contact.person.id) {
                     return Promise.reject(`That email belongs to ${person.firstName} ${person.lastName} (Id:${person.id})`);
                 }

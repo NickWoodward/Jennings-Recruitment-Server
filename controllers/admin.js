@@ -13,6 +13,7 @@ const Contact = require('../models/contact');
 const Person = require('../models/person');
 const Job = require('../models/job');
 const Company = require('../models/company');
+const { AddOnResultList } = require('twilio/lib/rest/api/v2010/account/recording/addOnResult');
 // const CompanyAddress = require('../models/companyAddress');
 
 // View magic methods 
@@ -658,66 +659,79 @@ exports.getCv = (req, res, next) => {
 
 exports.getJobs = async (req, res, next) => {
     const findOne = req.query.indexId;
+    const searchTerm = req.query.searchTerm;
     const index = req.query.index;
     let limit = req.query.limit;
     const orderField = req.query.orderField || 'createdAt';
     const orderDirection = req.query.orderDirection || 'DESC';
     let order;
-    let topRow;
+    let topRows = [];
+
 
     // Set the ordering
     switch(req.query.orderField) {
+        // ** CHANGE THE ARRAY STRUCTURE FOR OTHER QUERIES
         // add other cases here (see getApplications)
         // Check for unique order problems (see notes in that switch function)
+        case 'company': {
+            order = [ 
+                'company', 'name', orderDirection
+            ];
+            break;
+        }
         default:
             order = [ orderField, orderDirection ];
+    }
+
+    const topRowOptions = {
+        attributes: [
+            'id',
+            'title',
+            'wage',
+            'location',
+            'description',
+            'jobType',
+            'position',
+            'pqe',
+            'featured',
+            'createdAt',
+            [Sequelize.fn('date_format', Sequelize.col('job.createdAt'), '%d/%m/%y'), 'jobDate'],
+            'companyId'
+        ],
+        include: [ 
+            {
+                model: Company,
+                attributes: ['name'],
+            }, 
+            {
+                model: Applicant,
+                attributes: [
+                    'id', 
+                    'cvUrl', 
+                    'personId',
+                    [Sequelize.fn('date_format', Sequelize.col('applicants.createdAt'), '%d/%m/%y'), 'createdAt'],
+                ],
+                include: [ 
+                    {
+                        model: Person,
+                        attributes: [ 'firstName', 'lastName', 'phone', 'email' ]
+                    } 
+                ] 
+            }
+        ]
     }
 
     // Find a specific row to highlight if needed
     try {
 
         if(findOne) {
-            topRow = await Job.findByPk(findOne, {
-                attributes: [
-                    'id',
-                    'title',
-                    'wage',
-                    'location',
-                    'description',
-                    'jobType',
-                    'position',
-                    'pqe',
-                    'featured',
-                    'createdAt',
-                    [Sequelize.fn('date_format', Sequelize.col('job.createdAt'), '%d/%m/%y'), 'jobDate'],
-                    'companyId'
-                ],
-                include: [ 
-                    {
-                        model: Company,
-                        attributes: ['name']
-                    }, 
-                    {
-                        model: Applicant,
-                        attributes: [
-                            'id', 
-                            'cvUrl', 
-                            'personId',
-                            [Sequelize.fn('date_format', Sequelize.col('applicants.createdAt'), '%d/%m/%y'), 'createdAt'],
-                        ],
-                        include: [ 
-                            {
-                                model: Person,
-                                attributes: [ 'firstName', 'lastName', 'phone', 'email' ]
-                            } 
-                        ] 
-                    }
-                ]
-                
-            })
-            // Format to match the other jobs in the array (company object flattened)
-            topRow.dataValues.companyName = topRow.company.name;
-            delete topRow.dataValues.company;
+            const row = await Job.findByPk(findOne, topRowOptions);
+            topRows = formatJobTopRows([row]);
+        }
+        if(searchTerm) {
+            topRowOptions.include[0].where = { name: { [Op.like]: `%${searchTerm}%` } };
+            const rows = await Job.findAll(topRowOptions)
+            topRows = formatJobTopRows(rows);
         }
 
         const options = {
@@ -735,12 +749,12 @@ exports.getJobs = async (req, res, next) => {
                 [Sequelize.fn('date_format', Sequelize.col('job.createdAt'), '%d/%m/%y'), 'jobDate'],
                 'companyId'
             ],
-            order: [ [orderField, orderDirection] ],
+            order: [ order ],
             distinct: true,
             include: [ 
                 {
                     model: Company,
-                    attributes: ['name']
+                    attributes: ['name'],
                 }, 
                 {
                     model: Applicant,
@@ -764,59 +778,47 @@ exports.getJobs = async (req, res, next) => {
         if(req.query.index) options.offset = parseInt(index);
 
         const results = await Job.findAndCountAll(options);
+        results.rows = formatJobTopRows(results.rows)
+ 
 
-        results.rows = results.rows.map(({
-            dataValues: {
-                id, title, wage, location, description, featured, jobDate, companyId, jobType, position, pqe,
-                company: { name: companyName },
-                applicants,
-            }
-        }) => {
-            applicants = applicants.map(({ id, cvUrl, createdAt: appliedDate, personId, person: { firstName, lastName, phone, email } }) => {
-                const cvType = cvUrl? cvUrl.slice(cvUrl.lastIndexOf('.')):null;
-                const cvName = cvUrl? cvUrl.slice(12): 'No CV uploaded';
-
-                return { id, personId, firstName, lastName, cvType, cvName, appliedDate, phone, email };
-            });
-            
-            return { 
-                id,
-                title, 
-                wage, 
-                location, 
-                description, 
-                featured, 
-                jobType,
-                position,
-                pqe,
-                jobDate,
-                companyId, 
-                companyName, 
-                applicants
-                };
-        });
-        
         // If there's a row to be highlighted
-        if(topRow) {
-            console.log('topRow!');
-            const visible = results.rows.filter(job => job.id === topRow.id);
-            const index = results.rows.findIndex(job => job.id === topRow.id);
-
-            // 1 too many results in the array
-            if(results.rows.length + 1 > limit) {
-                // If the row appears in the array to be returned, remove it
-                if(visible) {
-                    results.rows.splice(index, 1);
-                } else {
-                    // Remove the last element instead
-                    results.rows.pop();
+        if(topRows.length > 0) {
+            console.log('TOP ROWS',topRows)
+            topRows.forEach(row => {
+                const visible = results.rows.filter(job => job.id === row.id)[0];
+                const index = results.rows.findIndex(job => job.id === row.id);
+    
+                // 1 too many results in the array
+                if(results.rows.length + topRows.length > limit) {
+                    // If the row appears in the array to be returned, remove it
+                    if(visible) {
+                        console.log('VISIBLE + LIMIT REACHED => SPLICE:  ', visible.title);
+                        console.log(index);
+                        results.rows.splice(index, 1);
+    
+                    } else {
+                        console.log('NOT VISIBLE + LIMIT REACHED => POP');
+                        console.log(index);
+                        // Remove the last element instead
+                        results.rows.pop();
+                    }
+                } else { 
+                    if(visible) {
+                        console.log('VISIBLE + LIMIT NOT REACHED REACHED', visible.title);
+                        console.log(index);
+    
+                        results.rows.splice(index, 1);
+                    } else {
+                        // do nothing
+                        console.log('NOT VISIBLE + LIMIT NOT REACHED', visible.title);
+                        console.log(index);
+    
+                    }
                 }
-            } else { 
-                if(visible) results.rows.splice(index, 1);
-            }
-            
-            // Add the highlighted topRow to the array
-            results.rows.unshift(topRow) 
+                
+                // Add the highlighted topRow to the array
+                results.rows.unshift(row) 
+            })
         }
 
         res.status(200).json({ msg: 'Success', jobs: results.rows, total: results.count });
@@ -922,6 +924,45 @@ exports.getJobs = async (req, res, next) => {
     // return findJobs;
 
 };
+
+const formatJobTopRows = (rows) => {
+    return rows.map(({
+        dataValues: {
+            id, title, wage, location, description, featured, jobDate, companyId, jobType, position, pqe,
+            company: { name: companyName },
+            applicants,
+        }
+    }) => {
+        applicants = applicants.map(({ id, cvUrl, createdAt: appliedDate, personId, person: { firstName, lastName, phone, email } }) => {
+            const cvType = cvUrl? cvUrl.slice(cvUrl.lastIndexOf('.')):null;
+            const cvName = cvUrl? cvUrl.slice(12): 'No CV uploaded';
+
+            return { id, personId, firstName, lastName, cvType, cvName, appliedDate, phone, email };
+        });
+        
+        return { 
+            id,
+            title, 
+            wage, 
+            location, 
+            description, 
+            featured, 
+            jobType,
+            position,
+            pqe,
+            jobDate,
+            companyId, 
+            companyName, 
+            applicants
+            };
+    });
+
+    // rows.forEach(row => {
+    //     row.dataValues.companyName = row.company.name;
+    //     delete row.dataValues.company;
+    // })
+    // return rows;
+}
 
 exports.getJobNames = async(req, res, next) => {
     try {
@@ -1164,12 +1205,14 @@ exports.getCompanyNames = async (req, res, next) => {
 
 exports.getCompanies = async (req, res, next) => {
     const findOne = req.query.indexId;
+    const searchTerm = req.query.searchTerm;
     const index = req.query.index || 0;
     const limit = req.query.limit || 0;
-    const orderField = req.query.orderField || 'createdAt';
+    const orderField = req.query.orderField || 'id';
     const orderDirection = req.query.orderDirection || 'DESC';
+
     let order;
-    let topRow;
+    let topRows = [];
 
     // Set the ordering
     switch(req.query.orderField) {
@@ -1179,61 +1222,92 @@ exports.getCompanies = async (req, res, next) => {
             order = [ orderField, orderDirection ];
     }
 
+    const topRowOptions = {
+        include: [
+            {
+                model: Address
+            },
+            {
+                model: Job,
+                attributes: [
+                    'id',
+                    'title',
+                    'wage',
+                    'location',
+                    'description',
+                    'featured',
+                    'jobType',
+                    'position',
+                    'pqe',
+                    'createdAt',
+                    [Sequelize.fn('date_format', Sequelize.col('jobs.createdAt' ), '%d/%m/%y'), 'jobDate'],
+                ]
+            },
+            {
+                model: Contact,
+                include: Person
+            }
+        ],
+        attributes: [ 
+            'id', 
+            'name',
+            'createdAt',
+            [Sequelize.fn('date_format', Sequelize.col('company.createdAt' ), '%d/%m/%y'), 'companyDate'],
+        ],
+    }
+
     try {
         // Find a specific row to highlight if needed
         if(findOne) {
-            topRow = await Company.findByPk(findOne, {
-                include: [
-                    {
-                        model: Address
-                    },
-                    {
-                        model: Job,
-                        attributes: [
-                            'id',
-                            'title',
-                            'wage',
-                            'location',
-                            'description',
-                            'featured',
-                            'jobType',
-                            'position',
-                            'pqe',
-                            'createdAt',
-                            [Sequelize.fn('date_format', Sequelize.col('jobs.createdAt' ), '%d/%m/%y'), 'jobDate'],
-                        ]
-                    },
-                    {
-                        model: Contact,
-                        include: Person
-                    }
-                ],
-                attributes: [ 
-                    'id', 
-                    'name',
-                    'createdAt',
-                    [Sequelize.fn('date_format', Sequelize.col('company.createdAt' ), '%d/%m/%y'), 'companyDate'],
-                ],
-            });
+            const row = await Company.findByPk(findOne, topRowOptions);
 
-            // Format toprow to match the other array elements
-            let { id, companyDate, name: companyName, addresses, jobs, contacts } = topRow.dataValues;
-            jobs = jobs.map(({ dataValues: { id: jobId, title, wage, location, description, featured, jobType, position, pqe, jobDate }}) => {
-                return {  jobId, title, wage, location, description, featured, jobType, position, pqe, jobDate }
-            });
-            contacts = contacts.map(({ dataValues: { id:contactId, position, person: { dataValues: { id: personId, firstName, lastName, phone, email } } }}) => {
-                return { contactId, personId, position, firstName, lastName, phone, email }
-            });
+            topRows = formatCompanyTopRows([row]);
 
-            topRow = { 
-                id, 
-                companyDate,
-                companyName, 
-                addresses,
-                jobs,
-                contacts
-            }
+            // // Format toprow to match the other array elements
+            // let { id, companyDate, name: companyName, addresses, jobs, contacts } = topRow[0].dataValues;
+            // jobs = jobs.map(({ dataValues: { id: jobId, title, wage, location, description, featured, jobType, position, pqe, jobDate }}) => {
+            //     return {  jobId, title, wage, location, description, featured, jobType, position, pqe, jobDate }
+            // });
+            // contacts = contacts.map(({ dataValues: { id:contactId, position, person: { dataValues: { id: personId, firstName, lastName, phone, email } } }}) => {
+            //     return { contactId, personId, position, firstName, lastName, phone, email }
+            // });
+
+            // topRow = { 
+            //     id, 
+            //     companyDate,
+            //     companyName, 
+            //     addresses,
+            //     jobs,
+            //     contacts
+            // }
         };
+
+        if(searchTerm) {
+            topRowOptions.where =  { name: { [Op.like]: `%${searchTerm}%` } };
+            const rows = await Company.findAll(topRowOptions)
+
+            topRows = formatCompanyTopRows(rows);
+
+            // // Format toprow to match the other array elements
+            // let { id, companyDate, name: companyName, addresses, jobs, contacts } = topRow.dataValues;
+            // jobs = jobs.map(({ dataValues: { id: jobId, title, wage, location, description, featured, jobType, position, pqe, jobDate }}) => {
+            //     return {  jobId, title, wage, location, description, featured, jobType, position, pqe, jobDate }
+            // });
+            // contacts = contacts.map(({ dataValues: { id:contactId, position, person: { dataValues: { id: personId, firstName, lastName, phone, email } } }}) => {
+            //     return { contactId, personId, position, firstName, lastName, phone, email }
+            // });
+
+            // topRow = { 
+            //     id, 
+            //     companyDate,
+            //     companyName, 
+            //     addresses,
+            //     jobs,
+            //     contacts
+            // }
+            console.log(searchTerm);
+            console.log(topRows.length, topRows);
+        }
 
         const options = {
             include: [
@@ -1268,7 +1342,7 @@ exports.getCompanies = async (req, res, next) => {
                 'createdAt',
                 [Sequelize.fn('date_format', Sequelize.col('company.createdAt' ), '%d/%m/%y'), 'companyDate'],
             ],
-            order: [ [orderField, orderDirection] ],
+            order: [ order ],
             distinct: true
         }
 
@@ -1276,6 +1350,7 @@ exports.getCompanies = async (req, res, next) => {
         if(req.query.index) options.offset = parseInt(index);
 
         const results = await Company.findAndCountAll(options);
+        const temp = results.rows.map(item => item.dataValues.name);
 
         results.rows = results.rows.map(({
             dataValues: { id, name: companyName, companyDate, addresses, jobs, contacts }
@@ -1301,45 +1376,51 @@ exports.getCompanies = async (req, res, next) => {
             }
         });
       
-
-        // console.dir(results.rows[1], {depth:2});
-
         // If there's a row to be highlighted
-        if(topRow) {
-            const visible = results.rows.filter(company => company.id === topRow.id)[0];
-            const index = results.rows.findIndex(company => company.id === topRow.id);
-            // 1 too many results in the array
-            if(results.rows.length + 1 > limit) {
-                // If the row appears in the array to be returned, remove it
-                if(visible) {
-                    console.log('VISIBLE + LIMIT REACHED => SPLICE:  ', {visible});
-                    console.log(index);
-                    results.rows.splice(index, 1);
-
-                } else {
-                    console.log('NOT VISIBLE + LIMIT REACHED => POP', {visible});
-                    console.log(index);
-
-                    // Remove the last element instead
-                    results.rows.pop();
+        if(topRows.length > 0) {
+            topRows.forEach(row => {
+                const visible = results.rows.filter(company => company.id === row.id)[0];
+                const index = results.rows.findIndex(company => company.id === row.id);
+                // 1 too many results in the array
+                if(results.rows.length + topRows.length > limit) {
+                    // If the row appears in the array to be returned, remove it
+                    if(visible) {
+                        console.log('VISIBLE + LIMIT REACHED => SPLICE:  ', {visible});
+                        console.log(index);
+                        results.rows.splice(index, 1);
+    
+                    } else {
+                        console.log('NOT VISIBLE + LIMIT REACHED => POP', {visible});
+                        console.log(index);
+    
+                        // Remove the last element instead
+                        results.rows.pop();
+                    }
+                } else { 
+                    if(visible) {
+                        console.log('VISIBLE + LIMIT NOT REACHED REACHED',{visible});
+                        console.log(index);
+    
+                        results.rows.splice(index, 1);
+                    } else {
+                        console.log('NOT VISIBLE + LIMIT NOT REACHED', {visible});
+                        console.log(index);
+    
+                    }
                 }
-            } else { 
-                if(visible) {
-                    console.log('VISIBLE + LIMIT NOT REACHED REACHED',{visible});
-                    console.log(index);
+                
+                // Add the highlighted topRow to the array
+                results.rows.unshift(row) 
+            });
 
-                    results.rows.splice(index, 1);
-                } else {
-                    console.log('NOT VISIBLE + LIMIT NOT REACHED', {visible});
-                    console.log(index);
+            topRows.forEach(row => console.log('TopRows', row.companyName));
+            console.log('------------');
+            results.rows.forEach(row => console.log('Results', row.companyName))
+            console.log('-----------');
+            console.log(temp);
 
-                }
+        } 
 
-            }
-            
-            // Add the highlighted topRow to the array
-            results.rows.unshift(topRow) 
-        }
         res.status(200).json({ companies: results.rows, companyTotal: results.count });
 
         return;
@@ -1349,6 +1430,7 @@ exports.getCompanies = async (req, res, next) => {
         next(err);
         return err;
     }
+
 
     // const index = req.query.index || 0;
     // const orderField = req.query.orderField || 'createdAt';
@@ -1404,6 +1486,30 @@ exports.getCompanies = async (req, res, next) => {
     //     return err;
     // });
 };
+
+const formatCompanyTopRows = (rows) => {
+    const arr = rows.map(row => {
+        // Format toprow to match the other array elements
+        let { id, companyDate, name: companyName, addresses, jobs, contacts } = row.dataValues;
+        jobs = jobs.map(({ dataValues: { id: jobId, title, wage, location, description, featured, jobType, position, pqe, jobDate }}) => {
+            return {  jobId, title, wage, location, description, featured, jobType, position, pqe, jobDate }
+        });
+        contacts = contacts.map(({ dataValues: { id:contactId, position, person: { dataValues: { id: personId, firstName, lastName, phone, email } } }}) => {
+            return { contactId, personId, position, firstName, lastName, phone, email }
+        });
+
+        return { 
+            id, 
+            companyDate,
+            companyName, 
+            addresses,
+            jobs,
+            contacts
+        }
+    });
+
+    return arr;
+}
 
 exports.getCompany = (req, res, next) => {
 
@@ -1999,15 +2105,9 @@ exports.editContact = async(req, res, next) => {
             await person.update(personValues);
             await contact.update(contactValues);
 
-            // // Map to the structure returned by every other company route
-            // const formattedContacts = company.dataValues.contacts.map(({ dataValues: { id:contactId, position, person: { dataValues: { id: personId, firstName, lastName, phone, email } } }}) => {
-            //     return { contactId, personId, position, firstName, lastName, phone, email }
-            // });
-
             const { dataValues: { id:contactId, position, person: { dataValues: { id: personId, firstName, lastName, phone, email } } }}  = contact;
             const formattedContact = { contactId, personId, position, firstName, lastName, phone, email };
-
-            // res.status(201).json({msg:'Contact Edited', contacts: formattedContacts});
+           
             res.status(201).json({msg:'Contact Edited', contact: formattedContact});
 
         });
@@ -2057,9 +2157,9 @@ exports.editAddress = async(req, res, next) => {
 
             await address.update(addressValues, {transaction: t});
 
-            console.log(company.addresses);
             // Return all addresses
-            res.status(201).json({msg: 'Address Edited', addresses: company.addresses});
+            // res.status(201).json({msg: 'Address Edited', addresses: company.addresses});
+            res.status(201).json({ msg: 'Address Edited', address: address });
         });
 
     } catch(err) {
@@ -2105,6 +2205,7 @@ exports.deleteAddress = async(req, res, next) => {
 exports.deleteContact = async(req, res, next) => {
     const contactId = req.params.id;
 
+    console.log(contactId);
     try {
         const contact = await Contact.findByPk(contactId, {
             include: [
