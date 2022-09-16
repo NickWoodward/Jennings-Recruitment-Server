@@ -26,7 +26,8 @@ const startServer = async( mode ) => {
     const server = app.listen(process.env.SERVER_PORT);
 };
 
-startServer('test');
+// startServer('test');
+startServer();
 
 
     // .then(async result => {
