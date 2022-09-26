@@ -13,11 +13,6 @@ const Contact = require('../models/contact');
 const Person = require('../models/person');
 const Job = require('../models/job');
 const Company = require('../models/company');
-const { AddOnResultList } = require('twilio/lib/rest/api/v2010/account/recording/addOnResult');
-// const CompanyAddress = require('../models/companyAddress');
-
-// View magic methods 
-// console.log(Object.keys(obj.__proto__));
 
 
 exports.getApplications = async(req, res, next) => {
@@ -347,46 +342,6 @@ exports.deleteApplication = async(req, res, next) => {
     res.status(200).json({msg: 'success'});
 };
 
-// exports.getApplications = async (req, res, next) => {
-//     const index = req.query.index || 0;
-//     const limit = req.query.limit || 10;
-//     const orderField = req.query.orderField || 'createdAt';
-//     const order = req.query.orderDirection || 'DESC';
-
-//     const { rows, count } = await Application.findAndCountAll({ 
-//         limit: parseInt(limit, 10), 
-//         offset: parseInt(index), 
-//         order: [[orderField, order]],
-//         distinct: true 
-//     });
-//     let results = [];
-
-//     try {
-//         await Promise.all(rows.map(async (application) => {
-//             const job = await Job.findOne({ where: { id: application.jobId }, include: { model: Company } });
-//             const applicant = await Applicant.findOne({ where: { id: application.applicantId }, include: { model: Person } });
-//             results.push({ 
-//                 applicationId: application.id,
-//                 companyId: job.companyId,
-//                 company: job.company.name,
-//                 jobId: job.id,
-//                 position: job.title,
-//                 applicantId: applicant.id,
-//                 personId: applicant.person.id,
-//                 firstName: applicant.person.firstName,
-//                 lastName: applicant.person.lastName,
-//                 email: applicant.person.email,
-//                 phone: applicant.person.phone,
-//                 cvUrl: applicant.cvUrl
-//             });
-//         }));
-//         res.status(200).json({msg: 'success', applications: results, total: count});
-
-//     } catch(err) {
-//         console.log(err);
-//     }
-// }
-
 //@TODO: validation
 exports.createApplicant = (req, res, next) => {
     const errors = validationResult(req);
@@ -504,8 +459,6 @@ exports.editApplicant = (req, res, next) =>{
         });
 };
 
-
-
 exports.getApplicants = async (req, res, next) => {
     const findOne = req.query.indexId;
     const index = req.query.index || 0;
@@ -515,49 +468,55 @@ exports.getApplicants = async (req, res, next) => {
     let order;
     let topRow;
 
-    // Set Ordering
-    switch(req.query.orderField) {
-        // Add other cases (see getApplications)
-        default:{ 
-            order = [orderField, orderDirection];
-        }
-    }
-
-    // Set the attributes for both the single highlight row and the returned rows
-    const applicantAttributes = [
-        'id',
-        'cvUrl',
-        'createdAt',
-        [Sequelize.fn('date_format', Sequelize.col('applicant.createdAt' ), '%d/%m/%y'), 'userDate']
-    ];
-    const personAttributes = [ 'id', 'firstName', 'lastName', 'phone', 'email' ];
-    const jobAttributes = [ 
-        'id', 
-        'title', 
-        'location',
-        [Sequelize.fn('date_format', Sequelize.col('jobs.createdAt' ), '%d/%m/%y'), 'jobDate']
-    ];
-    const companyAttributes = [ 'id', 'name' ];
-    const included = [
-        {
-            model: Person,
-            attributes: personAttributes,
-            include: Address 
-        },
-        {
-            model: Job,
-            attributes: jobAttributes,
-            include: [
-                {
-                    model: Company,
-                    attributes: companyAttributes
-                }
-            ]
-        }
-
-    ];
-
     try {
+        if(index < 0 || limit < 1) throw new Error();
+
+        // Set Ordering
+        switch(req.query.orderField) {
+            // Add other cases (see getApplications)
+            default:{ 
+                order = [orderField, orderDirection];
+            }
+        }
+
+        // Set the attributes for both the single highlight row and the returned rows
+        const applicantAttributes = [
+            'id',
+            'cvUrl',
+            'createdAt',
+            [Sequelize.fn('date_format', Sequelize.col('applicant.createdAt' ), '%d/%m/%y'), 'userDate']
+        ];
+        const personAttributes = [ 'id', 'firstName', 'lastName', 'phone', 'email' ];
+        const jobAttributes = [ 
+            'id', 
+            'title', 
+            'location',
+            'wage',
+            'jobType',
+            'pqe',
+            [Sequelize.fn('date_format', Sequelize.col('jobs.createdAt' ), '%d/%m/%y'), 'jobDate']
+        ];
+        const companyAttributes = [ 'id', 'name' ];
+        const included = [
+            {
+                model: Person,
+                attributes: personAttributes,
+                include: Address 
+            },
+            {
+                model: Job,
+                attributes: jobAttributes,
+                include: [
+                    {
+                        model: Company,
+                        attributes: companyAttributes
+                    }
+                ]
+            }
+
+        ];
+
+
         // Find the specific row to highlight if indexId provided
         if(findOne) {
             topRow = await Applicant.findByPk(findOne, {
@@ -642,8 +601,8 @@ const formatApplicants = (applicants) => {
             cvType = cvName.slice(cvName.lastIndexOf('.'));
         }
         // Format jobs array
-        jobs = jobs.map(( {dataValues: { id:jobId, title, location, jobDate, company: { id:companyId, name: companyName } }}) => {
-            return { jobId, title, location, jobDate, companyId, companyName };
+        jobs = jobs.map(( {dataValues: { id:jobId, title, location, wage, jobType, pqe, jobDate, company: { id:companyId, name: companyName } }}) => {
+            return { jobId, title, location, wage, jobType, pqe, jobDate, companyId, companyName };
         });
         // Format containing applicant
         return { id, personId, firstName, lastName, phone, email, cvType, cvName, userDate, jobs, addresses };

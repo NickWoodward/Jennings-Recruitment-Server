@@ -26,7 +26,7 @@ require('./startup/headers')(app);
 require('./startup/routes')(app);
 
 app.use((error, req, res, next) => {
-    console.log('error handler: ' + error.email);
+    console.log('error handler email: ' + error.email);
     const applicationId = error.applicationId;
     const status = error.statusCode || 500;
     console.log(error.validationErrors);
