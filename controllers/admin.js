@@ -25,8 +25,6 @@ exports.getApplications = async(req, res, next) => {
     let order;
     let topRows = [];
 
-    console.log('*********', orderField, orderDirection, {searchTerm});
-    console.log({limit}, {index});
     switch(req.query.orderField) {
         // case 'lastName': 
         //     order = [
@@ -151,8 +149,8 @@ exports.getApplications = async(req, res, next) => {
 
         // If there's a row to be highlighted
         if(topRows.length > 0) {
-            const test = topRows.map(row => row.toJSON())
-            console.log(test, test.length);
+            // const test = topRows.map(row => row.toJSON())
+            // console.log(test, test.length);
 
             topRows.forEach(row => {
                 const visible = applications.rows.filter(application => application.id === row.id)[0];
@@ -211,8 +209,10 @@ exports.getApplications = async(req, res, next) => {
         //     // Add the highlighted topRow to the array
         //     applications.rows.unshift(topRow) 
         // }
-        applications.rows.forEach(row => console.log(row.job.toJSON()))
-        console.log(applications.rows.length)
+
+
+        // applications.rows.forEach(row => console.log(row.job.toJSON()))
+        // console.log(applications.rows.length)
         res.status(200).json({msg: 'success', applications: applications});
 
     } catch (err) {
@@ -342,6 +342,74 @@ exports.deleteApplication = async(req, res, next) => {
     res.status(200).json({msg: 'success'});
 };
 
+exports.getApplicationStats = async(req, res, next) => {
+    // const range = req.query.months;
+    const range = 4;
+
+    const today = new Date();
+    const monthStartDate = getXMonthsAgo(range);
+    const weekStartDate = getLastWeek();
+    const lastWeekStartDate = getLastWeek(new Date(weekStartDate));
+
+    console.log(weekStartDate);
+    console.log(lastWeekStartDate);
+    console.log(monthStartDate);
+
+    try {
+        const whereMonth = { createdAt: {[Op.between]: [monthStartDate, today]}};
+        const whereWeek = { createdAt: {[Op.between]: [weekStartDate, today]} };
+        const whereLastWeek = { createdAt: { [Op.between]: [lastWeekStartDate, weekStartDate] } };
+
+        const results = await Promise.all([
+            Application.findAll({where: whereLastWeek}),
+            Application.findAll({where: whereWeek}),
+            Application.findAll({where: whereMonth, raw: true})
+        ]);
+        
+        const [ lastWeek, thisWeek, months ] = results;
+
+        const dateStrings = months.map(application => application.createdAt.toISOString().slice(0,7));
+        // Will return an array with the occurances of dates in the following format: { '2022-07': 3, '2022-08': 2, '2022-09': 4, '2022-10': 2 }
+        const appsPerMonth = itemsFoundInArray(dateStrings);
+
+        res.status(200).json({ lastWeek: lastWeek.length, thisWeek: thisWeek.length,  appsPerMonth});
+
+    } catch(err) {
+        console.log(err);
+        if(!err.statusCode) err.statusCode = 500;
+        next(err);
+        return err;
+    }
+
+};
+
+const getXMonthsAgo = (range = 4, month) => {
+    if(range > 12 || range < 1) throw new Error('Error: Invalid Range');
+    const startDate = new Date();
+    startDate.setMonth(startDate.getMonth() - range);
+
+    // The start date should be the beginning of the month
+    startDate.setDate('1');
+
+    return(startDate);
+}
+const getLastWeek = (start = new Date()) => {
+    const WEEK = 7;
+    // const startDate = new Date();
+    start.setDate(start.getDate() - WEEK);
+    return start;
+};
+
+const itemsFoundInArray = (items) => {
+    const found = {};
+
+    for(let x = 0; x < items.length; x++) {
+        found[items[x]] = ++found[items[x]] || 1;
+    }
+
+    return found;
+}
+
 //@TODO: validation
 exports.createApplicant = (req, res, next) => {
     const errors = validationResult(req);
@@ -407,7 +475,6 @@ exports.deleteApplicant = (req, res, next) => {
             next(error);
         }
         cvUrl = applicant.cvUrl;
-        console.log(cvUrl);
         // Destroying the person cascades to the applicant and the applications
         return applicant.person.destroy();
     }).then(applicant => {
@@ -418,7 +485,6 @@ exports.deleteApplicant = (req, res, next) => {
 };
 
 exports.editApplicant = (req, res, next) =>{
-    console.log(`Request: ${req.params.id}`);
 
     Applicant.findOne({
         where: { id: req.params.id },
@@ -430,7 +496,6 @@ exports.editApplicant = (req, res, next) =>{
                 error.statusCode = 404;
                 next(error);
             }
-            console.log(`Applicant found, applicantId: ${applicant.id}, personId: ${applicant.personId}`);
             if(req.file) applicant.cvUrl = req.file.filename;
             
             return applicant.save();
@@ -447,8 +512,6 @@ exports.editApplicant = (req, res, next) =>{
             person.firstName = req.body.firstName;
             person.lastName = req.body.lastName;
             person.phone = req.body.phone;
-
-            console.log(`Person: AppId:${applicant.id}, PersonId: ${person.id}`);
                     
             return person.save();
         }).then(result => {
@@ -467,7 +530,7 @@ exports.getApplicants = async (req, res, next) => {
     const orderDirection = req.query.orderDirection || 'DESC';
     let order;
     let topRow;
-
+    
     try {
         if(index < 0 || limit < 1) throw new Error();
 
@@ -637,7 +700,6 @@ exports.getApplicantNames = async (req, res, next) => {
 };
 
 exports.getCv = (req, res, next) => {
-    console.log(req.params);
     Applicant.findOne({ where: { personId: req.params.applicantId } })
         .then(applicant => {
             if(applicant && applicant.cvUrl) {
@@ -804,7 +866,6 @@ exports.getJobs = async (req, res, next) => {
 
         // If there's a row to be highlighted
         if(topRows.length > 0) {
-            console.log('TOP ROWS',topRows)
             topRows.forEach(row => {
                 const visible = results.rows.filter(job => job.id === row.id)[0];
                 const index = results.rows.findIndex(job => job.id === row.id);
@@ -841,9 +902,6 @@ exports.getJobs = async (req, res, next) => {
                 results.rows.unshift(row) 
             })
         }
-
-        results.rows.forEach(row => console.log(row.companyName))
-        console.log(results.rows.length)
 
         res.status(200).json({ msg: 'Success', jobs: results.rows, total: results.count });
         return;
@@ -919,7 +977,6 @@ exports.getJobNames = async(req, res, next) => {
 };
 
 exports.editJob = async (req, res, next) => {
-    console.log(req.body);
     try {
         const errors = validationResult(req);
 
@@ -1236,8 +1293,7 @@ exports.getCompanies = async (req, res, next) => {
             //     jobs,
             //     contacts
             // }
-            console.log(searchTerm);
-            console.log(topRows.length, topRows);
+   
         }
 
         const options = {
@@ -1343,13 +1399,6 @@ exports.getCompanies = async (req, res, next) => {
                 // Add the highlighted topRow to the array
                 results.rows.unshift(row) 
             });
-
-            topRows.forEach(row => console.log('TopRows', row.companyName));
-            console.log('------------');
-            results.rows.forEach(row => console.log('Results', row.companyName))
-            console.log('-----------');
-            console.log(temp);
-
         } 
 
         res.status(200).json({ companies: results.rows, companyTotal: results.count });
@@ -2136,7 +2185,6 @@ exports.deleteAddress = async(req, res, next) => {
 exports.deleteContact = async(req, res, next) => {
     const contactId = req.params.id;
 
-    console.log(contactId);
     try {
         const contact = await Contact.findByPk(contactId, {
             include: [

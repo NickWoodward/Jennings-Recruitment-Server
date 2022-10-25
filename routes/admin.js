@@ -19,6 +19,7 @@ router.get('/companies', adminController.getCompanies);
 router.get('/companyNames', adminController.getCompanyNames);
 router.get('/company/:id', adminController.getCompany);
 router.get('/applications', adminController.getApplications);
+router.get('/applicationstats', adminController.getApplicationStats);
 
 // @TODO: validation
 router.post('/create/applicant/', uploadFile('cv'), adminController.createApplicant);
